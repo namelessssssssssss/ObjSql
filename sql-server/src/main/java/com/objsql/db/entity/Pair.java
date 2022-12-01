@@ -1,4 +1,4 @@
-package com.objsql.db;
+package com.objsql.db.entity;
 
 import com.alibaba.fastjson.annotation.JSONField;
 import com.alibaba.fastjson.annotation.JSONType;
@@ -27,14 +27,6 @@ public class Pair<E1, E2> implements Serializable {
     public E2 getE2() {
         return e2;
     }
-
-//    public void setE1(E1 e1) {
-//        this.e1 = e1;
-//    }
-//
-//    public void setE2(E2 e2) {
-//        this.e2 = e2;
-//    }
 
     public Pair(E1 e1, E2 elementB) {
         this.e1 = e1;

@@ -1,9 +1,9 @@
 import com.alibaba.fastjson.JSON;
 
 import com.objsql.db.Tree;
-import com.objsql.db.Pair;
+import com.objsql.db.entity.Pair;
 import com.objsql.db.Table;
-import com.objsql.db.TableUtils;
+import com.objsql.db.util.TableUtils;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;

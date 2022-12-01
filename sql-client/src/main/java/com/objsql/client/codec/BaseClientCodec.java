@@ -110,6 +110,9 @@ public class BaseClientCodec extends MessageToMessageCodec<ByteBuf, ClientReques
         response.setSequenceId(message.getSequenceId());
         response.setSerializeType(message.getSerializeType());
         in.add(response);
+        if(byteBuf.refCnt() > 1){
+            byteBuf.release(byteBuf.refCnt());
+        }
     }
 
     private RawServerResponse decodeBody(ByteBuf buf,byte type) {

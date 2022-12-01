@@ -5,7 +5,7 @@ import com.objsql.common.codec.Codec;
 import com.objsql.common.codec.ObjectStreamCodec;
 import com.objsql.common.message.TableCreateParam;
 import com.objsql.common.util.common.ExceptionUtil;
-import com.objsql.db.Pair;
+import com.objsql.db.entity.Pair;
 import com.objsql.db.Table;
 import com.objsql.db.Tree;
 import com.objsql.message.RawClientRequest;

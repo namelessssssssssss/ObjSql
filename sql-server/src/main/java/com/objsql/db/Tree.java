@@ -3,14 +3,16 @@ package com.objsql.db;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.annotation.JSONCreator;
 import com.alibaba.fastjson.annotation.JSONField;
+import com.objsql.db.entity.SegmentReference;
+import com.objsql.db.entity.Pair;
+import com.objsql.db.entity.Segment;
 import lombok.experimental.Accessors;
 
 import java.io.IOException;
 import java.io.PrintStream;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.NoSuchElementException;
+import java.util.*;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 /**
  * B+树存储结构
@@ -35,10 +37,45 @@ public class Tree<Index> implements Iterable<Byte[]> {
      * 顶层索引
      */
     private Block<Index> top;
+
     /**
      * 叶子数据段头节点
      */
     private final Leaf<Index> head;
+
+    /**
+     * 数据节点缓存
+     */
+    private final List<Block<Index>> blockCache = new ArrayList<>();
+
+    /**
+     * 叶子节点缓存
+     */
+    private final List<Leaf<Index>> leafCache = new ArrayList<>();
+
+    private final ScheduledThreadPoolExecutor cleaner = new ScheduledThreadPoolExecutor(2);
+
+    /**
+     * 自动清理缓存
+     */
+    {
+        cleaner.scheduleAtFixedRate(()->{
+            //每次清理 0.5%的缓存
+            int size = blockCache.size()/200;
+            while (size>0) {
+                blockCache.remove(0);
+                size--;
+            }
+        },5000,5000, TimeUnit.MILLISECONDS);
+        cleaner.scheduleAtFixedRate(()->{
+            //每次清理0.5%缓存
+            int size = leafCache.size()/200;
+            while (size>0) {
+                leafCache.remove(0);
+                size--;
+            }
+        }, 2000,2000,TimeUnit.MILLISECONDS);
+    }
 
     /**
      * 目前所有叶子节点中元素的数量
@@ -58,9 +95,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
         this.head = newLeaf;
         Block<Index> newBlock = new Block<>(table.getBlockSize());
         newBlock.children.add(
-                new Pair<>(
-                        newLeaf.id, null
-                )
+                new Pair<>(new SegmentReference(newLeaf.id), null)
         );
         newBlock.childrenIsLeaf = true;
         newBlock.id = table.addBlock(newBlock);
@@ -97,7 +132,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
      */
     @lombok.Data
     @Accessors(chain = true)
-    public static class Block<Index> {
+    public static class Block<Index> implements Segment {
 
         /**
          * 获取当前索引段的索引，即子节点中排列最靠右，最大的索引(从小到大排列）
@@ -115,10 +150,12 @@ public class Tree<Index> implements Iterable<Byte[]> {
          */
         @JSONField(serialize = false)
         public int blockSize;
+
         /**
          * 子节点数据，包含一个Block或Leaf的索引，及其指向的物理页id。
          */
-        public List<Pair<Integer, Index>> children;
+        @JSONField(serialize = true)
+        public List<Pair<SegmentReference, Index>> children;
 
         /**
          * 标记子节点id是否是数据节点
@@ -142,7 +179,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
          *
          * @param newBlockOrLeaf 要添加的索引
          */
-        public UpdateElement add(Pair<Integer, Index> newBlockOrLeaf, Table<Index> table) throws IOException {
+        public UpdateElement add(Pair<SegmentReference, Index> newBlockOrLeaf, Tree<Index> tree) throws IOException {
             Comparable<Index> index = (Comparable<Index>) newBlockOrLeaf.getE2();
             int place = 0;
             //标记新节点是否是最大的
@@ -154,16 +191,16 @@ public class Tree<Index> implements Iterable<Byte[]> {
                     break;
                 }
             }
-            Pair<Integer, Comparable<Index>> newElement = new Pair<>();
+            Pair<SegmentReference, Comparable<Index>> newElement = new Pair<>();
             newElement.setE1(newBlockOrLeaf.getE1());
             newElement.setE2((Comparable<Index>) newBlockOrLeaf.getE2());
             //如果该索引大于所有索引，将其插入到队列尾部
             if (isBiggest) {
-                children.add((Pair<Integer, Index>) newElement);
+                children.add((Pair<SegmentReference, Index>) newElement);
             }
             //将否则将新索引插入到指定位置之前
             else {
-                children.add(place, (Pair<Integer, Index>) newElement);
+                children.add(place, (Pair<SegmentReference, Index>) newElement);
             }
             //如果需要分裂，进行分裂操作
             if (this.children.size() == blockSize) {
@@ -176,14 +213,17 @@ public class Tree<Index> implements Iterable<Byte[]> {
                 //重设每个块的索引
                 newBlock.children = sublist(children, (blockSize / 2) + 1, blockSize - 1);
                 //持久化新块...
-                newBlock.id = table.addBlock(newBlock);
+                newBlock.id = tree.table.addBlock(newBlock);
                 children = sublist(children, 0, blockSize / 2);
+                //缓存产生的新块
+                tree.blockCache.add(this);
+                tree.blockCache.add(newBlock);
                 //返回原有段的更新后的索引，及新段的编号及索引
-                return new UpdateElement(new Pair<>(this.id, this.getIndex()), new Pair<>(newBlock.id, newBlock.getIndex()));
+                return new UpdateElement(new Pair<>(new SegmentReference(this), this.getIndex()), new Pair<>(new SegmentReference(newBlock), newBlock.getIndex()));
             }//如果仅需父节点更新索引...
             else if (isBiggest) {
                 //返回新索引
-                return new UpdateElement(new Pair<>(this.id, this.getIndex()));
+                return new UpdateElement(new Pair<>(new SegmentReference(this), this.getIndex()));
             }//如果未产生分裂，也不用更新索引...
             else {
                 return null;
@@ -196,9 +236,9 @@ public class Tree<Index> implements Iterable<Byte[]> {
          * @param old      旧索引
          * @param newIndex 新索引及其段号
          */
-        public void replaceIndex(Comparable<Index> old, Pair<Integer, Comparable<Index>> newIndex) {
+        public void replaceIndex(Comparable<Index> old, Pair<SegmentReference, Comparable<Index>> newIndex) {
 
-            for (Pair<Integer, Index> index : children) {
+            for (Pair<SegmentReference, Index> index : children) {
                 if (((Comparable) index.getE2()).compareTo((Index) old) == 0) {
                     index.setE1(newIndex.getE1());
                     index.setE2((Index) newIndex.getE2());
@@ -216,12 +256,12 @@ public class Tree<Index> implements Iterable<Byte[]> {
         private UpdateElement delete(int place, Table<Index> table) {
             // 该节点要删除的索引位置是否是最后一个（该节点索引）
             boolean needRefresh = this.children.size() - 1 == place;
-            table.removeIndex(this.children.get(place).getE1());
+            table.removeIndex(this.children.get(place).getE1().getId());
             this.children.remove(place);
             if (this.children.isEmpty()) {
                 return new UpdateElement(true);
             } else if (needRefresh) {
-                return new UpdateElement(false, new Pair<>(this.id, this.getIndex()));
+                return new UpdateElement(false, new Pair<>(new SegmentReference(this), this.getIndex()));
             } else {
                 return null;
             }
@@ -232,7 +272,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
          *
          * @return 所在物理页id
          */
-        private int getId(Object blockOrLeaf) {
+        private int getId(Segment blockOrLeaf) {
             return (blockOrLeaf instanceof Block ? ((Block<Index>) blockOrLeaf).id : ((Leaf<Index>) blockOrLeaf).id);
         }
 
@@ -243,7 +283,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
         }
 
         @JSONCreator
-        public Block(int id, int blockSize, List<Pair<Integer, Index>> children, boolean childrenIsLeaf) {
+        public Block(int id, int blockSize, List<Pair<SegmentReference, Index>> children, boolean childrenIsLeaf) {
             this.id = id;
             this.blockSize = blockSize;
             this.children = children;
@@ -262,7 +302,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
      */
     @lombok.Data
     @Accessors(chain = true)
-    public static class Leaf<Index> {
+    public static class Leaf<Index> implements Segment{
         /**
          * 获取该段的索引值
          */
@@ -311,7 +351,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
          * @param data  数据
          * @return 若未达到叶子大小上限，返回null，若达到上限，返回新叶子节点。
          */
-        public UpdateElement add(Index index, byte[] data, Table<Index> table, int blockSize) throws IOException {
+        public UpdateElement add(Index index, byte[] data,Tree<Index> tree, int blockSize) throws IOException {
             int place = 0;
             boolean isBiggest = true;
             boolean isReplace = false;
@@ -354,14 +394,15 @@ public class Tree<Index> implements Iterable<Byte[]> {
                 newLeaf.next = this.next;
                 newLeaf.prev = this.id;
                 //创建新数据页并获取其id
-                newLeaf.id = table.addLeaf(newLeaf);
+                newLeaf.id = tree.table.addLeaf(newLeaf);
                 this.next = newLeaf.id;
+                tree.leafCache.add(newLeaf);
                 //返回该页新的索引信息及添加新页的索引信息
-                res = new UpdateElement(new Pair<>(this.id, this.getIndex()), new Pair<>(newLeaf.id, newLeaf.getIndex()));
+                res = new UpdateElement(new Pair<>(new SegmentReference(this), this.getIndex()), new Pair<>(new SegmentReference(newLeaf), newLeaf.getIndex()));
             } else {
-                res = isBiggest ? new UpdateElement(new Pair<>(this.id, this.getIndex())) : null;
+                res = isBiggest ? new UpdateElement(new Pair<>(new SegmentReference(this), this.getIndex())) : null;
             }
-            table.updateLeaf(this);
+            tree.table.updateLeaf(this);
             return res;
         }
 
@@ -409,7 +450,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
                 //若删除了最大的元素，且叶子中仍有数据，则父节点需要更新对该叶子的索引
                 else if (isBiggest) {
                     table.updateLeaf(this);
-                    return new UpdateElement(new Pair<>(this.id, this.getIndex()));
+                    return new UpdateElement(new Pair<>(new SegmentReference(this), this.getIndex()));
                 }
                 table.updateLeaf(this);
                 return null;
@@ -450,11 +491,11 @@ public class Tree<Index> implements Iterable<Byte[]> {
         if (!initialized) {
             //构造函数创建时，构造了一个空的Leaf节点。第一次插入时手动为该Leaf节点放入数据。
             top = new Block<Index>(table.getBlockSize()).setId(0).setChildrenIsLeaf(true);
-            top.getChildren().add(new Pair(0, index));
+            top.getChildren().add(new Pair(new SegmentReference(0), index));
             table.updateBlock(top);
             Leaf<Index> leaf = new Leaf<>(table.getBlockSize());
             leaf.setId(0);
-            leaf.add((Index) index, data, table, blockSize);
+            leaf.add((Index) index, data, this, blockSize);
             table.updateLeaf(leaf);
             initialized = true;
             table.setInitialized(true);
@@ -470,8 +511,8 @@ public class Tree<Index> implements Iterable<Byte[]> {
                     //创建新的top节点
                     Block<Index> newTop = new Block<>(blockSize);
                     //将原top节点和新产生的节点添加进去
-                    newTop.add(new Pair(top.id, top.getIndex()), table);
-                    newTop.add(new Pair(newBlock.newIndex.getE1(), newBlock.newIndex.getE2()), table);
+                    newTop.add(new Pair(new SegmentReference(top), top.getIndex()), this);
+                    newTop.add(new Pair(newBlock.newIndex.getE1(), newBlock.newIndex.getE2()), this);
                     this.top = newTop;
                     newTop.id = table.addBlock(newTop);
                     //设定新的头节点
@@ -554,7 +595,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
      * 将block转换为带泛型的对象
      */
     @SuppressWarnings("unchecked")
-    private Block<Index> toBlock(Object block) {
+    private Block<Index> toBlock(Segment block) {
         return (Block<Index>) block;
     }
 
@@ -562,7 +603,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
      * 将leaf转换为带泛型的对象
      */
     @SuppressWarnings("unchecked")
-    private Leaf<Index> toLeaf(Object leaf) {
+    private Leaf<Index> toLeaf(Segment leaf) {
         return (Leaf<Index>) leaf;
     }
 
@@ -573,12 +614,12 @@ public class Tree<Index> implements Iterable<Byte[]> {
      * @param index       索引
      * @param data        数据。若是删除操作为null。
      */
-    private UpdateElement findAndUpdate(Index index, byte[] data, Object blockOrLeaf) throws IOException {
+    private UpdateElement findAndUpdate(Index index, byte[] data,Segment blockOrLeaf) throws IOException {
         if (blockOrLeaf instanceof Leaf) {
             UpdateElement res = null;
             if (data != null) {
                 //增加
-                res = toLeaf(blockOrLeaf).add(index, data, table, blockSize);
+                res = toLeaf(blockOrLeaf).add(index, data, this, blockSize);
                 if (res == null) {
                     return null;
                 } else {
@@ -600,8 +641,10 @@ public class Tree<Index> implements Iterable<Byte[]> {
                     //若其比所有Block的索引都大，就访问最后一个Block。
                     if (toComparable(index).compareTo((Index) (toBlock(blockOrLeaf)).children.get(place).getE2()) <= 0
                             || place == (toBlock(blockOrLeaf).children.size() - 1)) {
-                        int childId = toBlock(blockOrLeaf).children.get(place).getE1();
-                        Object next = toBlock(blockOrLeaf).childrenIsLeaf ? table.readLeaf(childId, this.blockSize) : table.readBlock(childId, this.blockSize);
+
+                        SegmentReference child = toBlock(blockOrLeaf).children.get(place).getE1();
+                        Segment next = child.hasInstance() ? child.getInstance() :
+                                toBlock(blockOrLeaf).childrenIsLeaf ? table.readLeaf(child, this.blockSize,leafCache) : table.readBlock(child, this.blockSize,blockCache);
                         UpdateElement needToAdd = findAndUpdate(index, data, next);
                         UpdateElement res = null;
                         //若返回了UpdateElement，表示该层索引需要添加/更新索引
@@ -624,7 +667,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
                             }
                             //如果返回了新Block或Leaf
                             if (needToAdd.newIndex != null) {
-                                res = (toBlock(blockOrLeaf).add((Pair<Integer, Index>) needToAdd.newIndex, table));
+                                res = (toBlock(blockOrLeaf).add((Pair<SegmentReference, Index>) needToAdd.newIndex, this));
                             }
                             //统一更新当前索引页信息
                             table.updateBlock(toBlock(blockOrLeaf));
@@ -639,8 +682,8 @@ public class Tree<Index> implements Iterable<Byte[]> {
                     UpdateElement re = null;
                     if (toComparable(index).compareTo((Index) (toBlock(blockOrLeaf).children.get(place)).getE2()) <= 0
                             || place == toBlock(blockOrLeaf).children.size() - 1) {
-                        int childId = toBlock(blockOrLeaf).children.get(place).getE1();
-                        Object next = toBlock(blockOrLeaf).childrenIsLeaf ? table.readLeaf(childId, this.blockSize) : table.readBlock(childId, this.blockSize);
+                        SegmentReference child = toBlock(blockOrLeaf).children.get(place).getE1();
+                        Segment next = toBlock(blockOrLeaf).childrenIsLeaf ? table.readLeaf(child, this.blockSize,leafCache) : table.readBlock(child, this.blockSize,blockCache);
                         result = findAndUpdate(index, null, next);
                         if (result == null) {
                             re = null;
@@ -674,19 +717,19 @@ public class Tree<Index> implements Iterable<Byte[]> {
          */
         public boolean needDelete = false;
         /**
-         * 旧索引要修改为的新索引,<新索引物理段id，新索引值>
+         * 旧索引要修改为的新索引,<新索引物理段，新索引值>
          */
-        public Pair<Integer, Comparable<?>> newIndex;
+        public Pair<SegmentReference, Comparable<?>> newIndex;
         /**
-         * 需要更新的旧索引,<索引物理段id，更新后的新索引值>
+         * 需要更新的旧索引,<索引物理段，更新后的新索引值>
          */
-        public Pair<Integer, Comparable<?>> updateIndex;
+        public Pair<SegmentReference, Comparable<?>> updateIndex;
 
 
         public UpdateElement() {
         }
 
-        public UpdateElement(boolean needDelete, Pair<Integer, Comparable<?>> newIndex) {
+        public UpdateElement(boolean needDelete, Pair<SegmentReference, Comparable<?>> newIndex) {
             this.needDelete = needDelete;
             this.newIndex = newIndex;
         }
@@ -695,16 +738,16 @@ public class Tree<Index> implements Iterable<Byte[]> {
             this.needDelete = needDelete;
         }
 
-        public UpdateElement(Pair<Integer, Comparable<?>> updateIndex, Pair<Integer, Comparable<?>> newIndex) {
+        public UpdateElement(Pair<SegmentReference, Comparable<?>> updateIndex, Pair<SegmentReference, Comparable<?>> newIndex) {
             this.updateIndex = updateIndex;
             this.newIndex = newIndex;
         }
 
-        public UpdateElement(Pair<Integer, Comparable<?>> updateIndex) {
+        public UpdateElement(Pair<SegmentReference, Comparable<?>> updateIndex) {
             this.updateIndex = updateIndex;
         }
 
-        public UpdateElement(boolean needDelete, Pair<Integer, Comparable<?>> updateIndex, Pair<Integer, Comparable<?>> newIndex) {
+        public UpdateElement(boolean needDelete, Pair<SegmentReference, Comparable<?>> updateIndex, Pair<SegmentReference, Comparable<?>> newIndex) {
             this.needDelete = needDelete;
             this.newIndex = newIndex;
             this.updateIndex = updateIndex;
@@ -712,7 +755,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
     }
 
 
-    private Comparable<?> getIndex(Object blockOrLeaf) {
+    private Comparable<?> getIndex(Segment blockOrLeaf) {
         return (blockOrLeaf instanceof Block ? ((Block) blockOrLeaf).getIndex() : ((Leaf) blockOrLeaf).getIndex());
     }
 
@@ -724,7 +767,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
         print(this.top, 0);
     }
 
-    private void print(Object now, int depth) throws IOException {
+    private void print(Segment now, int depth) throws IOException {
         System.out.println(getGap(depth) + now.toString());
         if (now instanceof Leaf || now == null) {
             for (Object pair : ((Leaf) now).getIndexedData()) {
@@ -758,12 +801,12 @@ public class Tree<Index> implements Iterable<Byte[]> {
      * @return 可能所在的叶子页。子叶可以不包含该索引。
      */
     private Leaf<Index> findLeaf(Index index) throws IOException {
-        Object now = this.top;
+        Segment now = this.top;
         //如果当前节点类型为Leaf，表示已找到叶子节点
         while (!(now instanceof Leaf)) {
             int place = 0;
             //找到index在当前索引列表中的范围
-            for (Pair<Integer, Index> indexPair : ((Block<Index>) now).children) {
+            for (Pair<SegmentReference, Index> indexPair : ((Block<Index>) now).children) {
                 if (((Comparable) index).compareTo(indexPair.getE2()) <= 0) {
                     break;
                 }
@@ -785,10 +828,21 @@ public class Tree<Index> implements Iterable<Byte[]> {
      * @param place       位置
      * @return 读取的子节点，blockOrLeaf
      */
-    private Object readChild(Object blockOrLeaf, int place) throws IOException {
-        return ((Block<Index>) blockOrLeaf).childrenIsLeaf ?
-                table.readLeaf(((Block<Index>) blockOrLeaf).children.get(place).getE1(), this.blockSize) :
-                table.readBlock(((Block<Index>) blockOrLeaf).children.get(place).getE1(), this.blockSize);
+    private Segment readChild(Segment blockOrLeaf, int place) throws IOException {
+        Block<Index> block = (Block) blockOrLeaf;
+        SegmentReference element = block.children.get(place).getE1();
+        //如果缓存对象未被回收，直接返回
+        if(element.hasInstance()){
+            return element.getInstance();
+        }
+        if(!((Block)blockOrLeaf).childrenIsLeaf){
+            Block res =  table.readBlock(element, this.blockSize,blockCache);
+            return res;
+        }
+        else {
+            Leaf res =  table.readLeaf(element, this.blockSize,leafCache);
+            return res;
+        }
     }
 
     /**

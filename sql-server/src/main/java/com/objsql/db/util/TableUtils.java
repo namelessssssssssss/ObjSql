@@ -1,6 +1,7 @@
-package com.objsql.db;
+package com.objsql.db.util;
 
 import com.alibaba.fastjson.util.ParameterizedTypeImpl;
+import com.objsql.db.MaxSize;
 
 import java.io.IOException;
 import java.lang.reflect.Field;

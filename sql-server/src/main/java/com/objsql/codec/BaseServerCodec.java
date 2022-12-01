@@ -108,6 +108,9 @@ public class BaseServerCodec extends MessageToMessageCodec<ByteBuf, ServerRespon
         request.setSequenceId(message.getSequenceId());
         request.serializeType(message.getSerializeType());
         in.add(request);
+        if(buf.refCnt() > 1){
+            buf.release(buf.refCnt()-1);
+        }
     }
 
     private RawClientRequest decodeBody(ByteBuf body, byte commandType) throws Exception {

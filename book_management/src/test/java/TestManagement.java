@@ -4,7 +4,7 @@ import com.namless.repository.BookRepository;
 import com.namless.repository.LentRepository;
 import com.namless.service.impl.BookServiceImpl;
 import com.namless.service.impl.LentServiceImpl;
-import com.objsql.ServerBoot;
+import com.objsql.client.datasource.BaseRepository;
 import com.objsql.common.util.common.Assert;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -42,7 +42,7 @@ public class TestManagement {
          bookService.addNewBook(new Book().setBookName("JavaWeb高级编程").setAuthor("Nicholas S.Williams").setDocCode(4L).setRemains(1).setAll(1));
          bookService.addNewBook(new Book().setBookName("深入理解Java虚拟机").setAuthor("周志明").setDocCode(5L).setRemains(1).setAll(1));
 
-        System.err.println("添加1000本库存:");
+        System.err.println("添加了1000本库存");
         for(int k=0;k<1000;k++) {
            bookService.addNewBook(new Book().setDocCode(new Long(k % 5 +1)));
         }
@@ -53,13 +53,13 @@ public class TestManagement {
             System.err.println(bookService.getBook(k));
         }
 
-        System.err.println("借阅100本书籍");
+        System.err.println("模拟4个用户共借阅100本书籍");
         for(int k = 0;k<100;k++){
             //设置4个不同的借阅者
             lentService.addNewRecord(new Lent().setDocCode( new Long(k % 6 +1)).setBorrowerName("borrower-"+(k % 4)).setId(k));
         }
 
-        System.err.println("根据借阅者名称查询借阅记录:");
+        System.err.println("根据借阅者名称查询借阅记录");
         for(int k = 0;k<100;k++){
             System.err.println(lentService.getRecord("borrower-"+(k % 4)));
         }
@@ -93,6 +93,24 @@ public class TestManagement {
         System.err.println(bookService.getByAuthor("Robert C.Martin"));
         System.err.println(bookService.getByAuthor("Nicholas S.Williams"));
         System.err.println(bookService.getByAuthor("周志明"));
+
+    }
+
+    @Test
+    void testCache(){
+        new BookRepository(2048,1024,6,20480);
+        new LentRepository(2048,1024,10,20480);
+
+        try {
+            lentService = new LentServiceImpl();
+            bookService = new BookServiceImpl();
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+        bookService.addNewBook(new Book().setBookName("Java核心技术-卷I").setAuthor("Cay S.Horstmann").setDocCode(1L).setRemains(1).setAll(1));
+        for(int k = 0;k<100000L;k++){
+            bookService.addNewBook(new Book().setDocCode((long) k).setBookName("book"+k).setRemains(1).setAll(1).setAuthor("author"+k));
+        }
 
     }
 }

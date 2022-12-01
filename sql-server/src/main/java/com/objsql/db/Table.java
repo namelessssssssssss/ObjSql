@@ -9,6 +9,8 @@ import com.objsql.common.codec.ObjectStreamCodec;
 import com.objsql.common.util.protocol.ByteCodeLoader;
 import com.objsql.common.util.protocol.ByteCodeWriter;
 import com.objsql.common.util.common.ExceptionUtil;
+import com.objsql.db.entity.SegmentReference;
+import com.objsql.db.util.TableUtils;
 import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
 
@@ -18,6 +20,7 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Properties;
 
@@ -448,6 +451,13 @@ public class Table<Index> {
         return block.setBlockSize(size);
     }
 
+    public Tree.Block<Index> readBlock(SegmentReference reference, int size, Collection cache) throws IOException {
+        Tree.Block<Index> block = readBlock(reference.getId(),size);
+        reference.setInstance(block);
+        cache.add(block);
+        return block;
+    }
+
     /**
      * 读取一个数据段
      *
@@ -462,6 +472,13 @@ public class Table<Index> {
         return leaf.setLeafSize(size);
     }
 
+    public Tree.Leaf<Index> readLeaf(SegmentReference reference, int size, Collection cache) throws IOException {
+        Tree.Leaf<Index> leaf = readLeaf(reference.getId(),size);
+        reference.setInstance(leaf);
+        cache.add(leaf);
+        return leaf;
+    }
+
 
     /**
      * 存储一个新的索引段
@@ -472,9 +489,9 @@ public class Table<Index> {
         ByteBuffer writeBuffer = ByteBuffer.allocate(indexSegmentSize);
         int id = getNewIndexSegmentId();
         block.setId(id);
-        writeBuffer.put(block.serialize());
-        writeBuffer.position(writeBuffer.capacity());
-        writeBuffer.flip();
+            writeBuffer.put(block.serialize());
+            writeBuffer.position(writeBuffer.capacity());
+            writeBuffer.flip();
         indexChannel.write(writeBuffer, getIndexSegmentOffset(id));
         return id;
     }
@@ -492,8 +509,8 @@ public class Table<Index> {
 
     public void updateBlock(Tree.Block<Index> block) throws IOException {
         ByteBuffer writeBuffer = ByteBuffer.allocate(indexSegmentSize);
-        writeBuffer.put(block.serialize());
-        writeBuffer.position(writeBuffer.capacity());
+            writeBuffer.put(block.serialize());
+            writeBuffer.position(writeBuffer.capacity());
         writeBuffer.flip();
         indexChannel.write(writeBuffer, getIndexSegmentOffset(block.id));
     }

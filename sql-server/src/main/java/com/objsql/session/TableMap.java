@@ -2,7 +2,7 @@ package com.objsql.session;
 
 
 import com.objsql.db.Tree;
-import com.objsql.db.Pair;
+import com.objsql.db.entity.Pair;
 import com.objsql.db.Table;
 
 import java.io.IOException;
