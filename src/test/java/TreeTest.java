@@ -1,15 +1,21 @@
 
-import com.objsql.db.Tree;
 import com.objsql.db.Table;
+import com.objsql.db.Tree;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 class TreeTest {
 
+    @Test
+    void test() throws IOException {
+        new Tree<>("test04").printStucture();
+    }
 
-//    //B+树随机、顺序插入 & 查找测试
+
+    //    //B+树随机、顺序插入 & 查找测试
 //    @Test
 //    public void add1() throws IOException {
 //        long counter = System.currentTimeMillis();
@@ -71,7 +77,7 @@ class TreeTest {
 //
     @Test
     public void add2() throws IOException {
-        Table<Long> table = new Table<>("test03", 2048, 1024, 5,Long.class,4096);
+        Table<Long> table = new Table<>("test03", 2048, 1024, 5, Long.class, String.class, 4096);
         Tree<Long> bTree = new Tree<>(table);
         List<Long> added = new ArrayList<>(1000);
         //添加1000个元素，可以重复
@@ -82,12 +88,12 @@ class TreeTest {
         }
         //测试查找添加的每一个元素
         for (Long index : added) {
-             byte[] data;
-           if( (data = bTree.get(index)).length > 0){
-               System.err.println("找不到元素"+index);
-           }else {
-               System.out.println("找到元素："+ new String(data));
-           }
+            byte[] data;
+            if ((data = bTree.get(index)).length > 0) {
+                System.err.println("找不到元素" + index);
+            } else {
+                System.out.println("找到元素：" + new String(data));
+            }
         }
 //        //遍历底层叶子节点，测试其索引是否有序
 //        for ( data : bTree) {
@@ -98,10 +104,10 @@ class TreeTest {
 
     @Test
     public void delete() throws IOException {
-        Table<Long> table = new Table<>("test03", 2048, 1024, 5,Long.class,4096);
+        Table<Long> table = new Table<>("test03", 2048, 1024, 5, Long.class, String.class, 4096);
         Tree<Long> tree = new Tree<>(table);
         for (long k = 0; k < 1000; k++) {
-            tree.add(k, ("rawIndex="+k).getBytes());
+            tree.add(k, ("rawIndex=" + k).getBytes());
         }
         for (long k = 999; k >= 0; k--) {
             tree.remove(k);
@@ -112,7 +118,7 @@ class TreeTest {
 //        }
 
         for (long k = 2000; k < 3000; k++) {
-            tree.add(k, ("rawIndex="+k).getBytes());
+            tree.add(k, ("rawIndex=" + k).getBytes());
         }
 
 //        for (String data : tree) {

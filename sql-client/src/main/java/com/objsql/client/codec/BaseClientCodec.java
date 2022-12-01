@@ -7,9 +7,9 @@ import com.objsql.common.codec.Codec;
 import com.objsql.common.codec.JsonCodec;
 import com.objsql.common.codec.ObjectStreamCodec;
 import com.objsql.common.protocol.constants.ProtocolConstants;
-import com.objsql.common.protocol.util.HeadCodec;
-import com.objsql.common.protocol.util.HeadMessage;
-import com.objsql.common.util.BytesReader;
+import com.objsql.common.util.protocol.HeadCodec;
+import com.objsql.common.message.HeadMessage;
+import com.objsql.common.util.protocol.BytesReader;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -28,11 +28,6 @@ import static com.objsql.common.protocol.constants.MessageTypes.*;
 @Slf4j
 @ChannelHandler.Sharable
 public class BaseClientCodec extends MessageToMessageCodec<ByteBuf, ClientRequest> {
-
-    //校验用头信息
-    private static final int MAGIC = 1324;
-    //版本号
-    private static final byte VERSION = 1;
 
     public static final Map<Byte, Codec> codecMap = new HashMap<>();
 
@@ -83,8 +78,12 @@ public class BaseClientCodec extends MessageToMessageCodec<ByteBuf, ClientReques
             return CommandBuilder.create(clientRequest.getTableParam(), codec, buf);
         } else if (clientRequest.getMessageType() == GET) {
             return CommandBuilder.get(clientRequest.getTableName(), codec.encodeMessage(clientRequest.getIndex()), buf);
-        } else if (clientRequest.getMessageType() == GET_BY_SEG_ID) {
-            return CommandBuilder.getBySeg(clientRequest.getTableName(), clientRequest.getSegmentId(), clientRequest.getPlace(), buf);
+        } else if (clientRequest.getMessageType() == GET_BY_FIELD) {
+            return CommandBuilder.getByField(
+                    clientRequest.getTableName(),
+                    codec.encodeMessage(clientRequest.getIndex()),
+                    clientRequest.getDataField().getName(),
+                    buf);
         } else if (clientRequest.getMessageType() == INSERT) {
             return CommandBuilder.insert(clientRequest.getTableName(), codec.encodeMessage(clientRequest.getIndex()), codec.encodeMessage(clientRequest.getData()), buf);
         } else if (clientRequest.getMessageType() == UPDATE) {
@@ -101,23 +100,6 @@ public class BaseClientCodec extends MessageToMessageCodec<ByteBuf, ClientReques
     }
 
     /**
-     * 头信息，10 + 4字节
-     */
-    private void writeHeader(ByteBuf byteBuf, ClientRequest clientRequest) {
-        //校验数,4字节
-        byteBuf.writeInt(MAGIC);
-        //版本号,1字节
-        byteBuf.writeByte(VERSION);
-        //正文序列化方式,1字节
-        byteBuf.writeByte(clientRequest.getSerializeType());
-        //请求序号,4字节
-        byteBuf.writeInt(clientRequest.getSequenceId());
-        //请求体长度，占位
-        byteBuf.writeInt(0);
-    }
-
-
-    /**
      * 解码服务端响应信息
      */
     @Override
@@ -132,23 +114,24 @@ public class BaseClientCodec extends MessageToMessageCodec<ByteBuf, ClientReques
 
     private RawServerResponse decodeBody(ByteBuf buf,byte type) {
         RawServerResponse response = new RawServerResponse().setResponseType(type);
-        switch (type) {
-            case GET:
-                return response.setRawData(BytesReader.readPart(buf));
-            case EXCEPTION:
-                return response.setMessage(BytesReader.readStringPart(buf));
-            case BEAT:
-            case GET_BY_SEG_ID:
-            case CONNECT:
-            case CREATE:
-            case INSERT:
-            case UPDATE:
-            case DELETE:
-            case DROP:
-                return response;
-            default:
-                throw new RuntimeException("未知响应类型:" + type);
-        }
+            switch (type) {
+                case GET:
+                    return response.setRawData(BytesReader.readPart(buf));
+                case EXCEPTION:
+                    return response.setMessage(BytesReader.readStringPart(buf));
+                case BEAT:
+                case GET_BY_FIELD:
+                    return response.setMultipartRawData(BytesReader.readParts(buf));
+                case CONNECT:
+                case CREATE:
+                case INSERT:
+                case UPDATE:
+                case DELETE:
+                case DROP:
+                    return response;
+                default:
+                    throw new RuntimeException("未知响应类型:" + type);
+            }
 
     }
 

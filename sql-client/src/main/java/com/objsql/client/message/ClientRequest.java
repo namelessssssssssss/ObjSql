@@ -3,6 +3,7 @@ package com.objsql.client.message;
 import com.objsql.common.message.TableCreateParam;
 
 import java.io.Serializable;
+import java.lang.reflect.Field;
 
 import static com.objsql.common.protocol.constants.MessageTypes.*;
 
@@ -27,8 +28,10 @@ public class ClientRequest implements Serializable {
     private Object index;
 
     private Object data;
-
-
+    /**
+     * 非索引字段查询的字段
+     */
+    private Field dataField;
     private Class<?> dataClass;
 
     private TableCreateParam tableParam;
@@ -63,10 +66,10 @@ public class ClientRequest implements Serializable {
         return new Create();
     }
 
-    public GetBySeg getBySeg() {
+    public GetByField getByField() {
         this.currentThread = Thread.currentThread();
-        this.messageType = GET_BY_SEG_ID;
-        return new GetBySeg();
+        this.messageType = GET_BY_FIELD;
+        return new GetByField();
     }
 
     public Insert insert() {
@@ -93,8 +96,8 @@ public class ClientRequest implements Serializable {
         return new Drop();
     }
 
-    public Ping ping(){
-        this.currentThread =Thread.currentThread();
+    public Ping ping() {
+        this.currentThread = Thread.currentThread();
         this.messageType = BEAT;
         return new Ping();
     }
@@ -158,19 +161,24 @@ public class ClientRequest implements Serializable {
         }
     }
 
-    public class GetBySeg {
-        public GetBySeg tableName(String tableName) {
+    public class GetByField {
+        public GetByField tableName(String tableName) {
             ClientRequest.this.tableName = tableName;
             return this;
         }
 
-        public GetBySeg segmentId(int segmentId) {
-            ClientRequest.this.segmentId = segmentId;
+        public GetByField field(Field field) {
+            ClientRequest.this.dataField = field;
             return this;
         }
 
-        public GetBySeg place(int place) {
-            ClientRequest.this.place = place;
+        public GetByField key(Object key){
+            ClientRequest.this.index = key;
+            return this;
+        }
+
+        public GetByField dataClass(Class<?> clazz){
+            ClientRequest.this.dataClass = clazz;
             return this;
         }
 
@@ -266,7 +274,9 @@ public class ClientRequest implements Serializable {
      * 心跳
      */
     public class Ping {
-        public ClientRequest finish(){return ClientRequest.this;}
+        public ClientRequest finish() {
+            return ClientRequest.this;
+        }
     }
 
 
@@ -325,5 +335,11 @@ public class ClientRequest implements Serializable {
         this.sequenceId = sequenceId;
     }
 
+    public Field getDataField() {
+        return dataField;
+    }
 
+    public Class<?> getDataClass() {
+        return dataClass;
+    }
 }

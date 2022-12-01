@@ -1,4 +1,4 @@
-package com.objsql.common.util;
+package com.objsql.common.util.common;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;

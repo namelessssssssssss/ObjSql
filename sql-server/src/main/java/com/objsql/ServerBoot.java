@@ -29,7 +29,7 @@ public class ServerBoot {
         boot();
     }
 
-    private static void boot(){
+    public static void boot(){
 
         NioEventLoopGroup bossGroup = new NioEventLoopGroup();
         NioEventLoopGroup workerGroup = new NioEventLoopGroup();
@@ -56,7 +56,7 @@ public class ServerBoot {
                         .addLast(new IdleStateHandler(3600, 7200,7200, TimeUnit.SECONDS))
                         .addLast(new ClientNotActiveHandler())
                         .addLast(new ProtocolFrameDecoder())
-                        .addLast(loggingHandler)
+                    //    .addLast(loggingHandler)
                         .addLast(baseServerCodec)
                         .addLast(requestHandler);
             }

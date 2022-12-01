@@ -5,10 +5,12 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.TypeReference;
 import com.alibaba.fastjson.annotation.JSONCreator;
 import com.alibaba.fastjson.annotation.JSONField;
-import com.objsql.common.util.ExceptionUtil;
+import com.objsql.common.codec.ObjectStreamCodec;
+import com.objsql.common.util.protocol.ByteCodeLoader;
+import com.objsql.common.util.protocol.ByteCodeWriter;
+import com.objsql.common.util.common.ExceptionUtil;
 import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
-import com.objsql.common.codec.ObjectStreamCodec;
 
 import java.io.File;
 import java.io.IOException;
@@ -72,7 +74,7 @@ public class Table<Index> {
      * 数据库路径,默认位于项目路径下
      */
     @JSONField(serialize = false)
-    private static String publicFilePath = new File(System.getProperty("user.dir") + File.separator + "com/objsql/db").getPath();
+    private static String publicFilePath;
     /**
      * 索引文件路径
      */
@@ -148,18 +150,32 @@ public class Table<Index> {
      */
     @JSONField
     private List<Integer> availableIndexSegmentSlot;
-
+    /**
+     * 索引类Class
+     */
     @JSONField(serialize = false)
     Class<Index> indexClass;
+    /**
+     * 数据类Class
+     */
+    @JSONField(serialize = false)
+    Class dataClass;
 
-//    @JSONField(serialize = false)
-//    Class<Data> dataClass;
+    /**
+     * 索引的序列化方式
+     */
+    private byte indexSerializeType;
+
+    /**
+     * 数据的序列化方式
+     */
+    private byte dataSerializeType;
 
 
     /**
-     * 索引Class序列化后所占长度
+     * 索引、数据Class序列化后所占长度
      */
-    private int indexObjStreamLength;
+    private int objStreamLength;
 
     /**
      * 表实例json序列化后所占长度
@@ -171,17 +187,23 @@ public class Table<Index> {
      */
     private int metaDataOffset;
 
+    /**
+     * data文件结构：
+     *  |len(index)|index(objStream)|len(data)|data(objStream)|len(jsonTableSegmentLentgh)|table(json)|  空余空间  | dataSegment0 | dataSegment1 | dataSegment2 |...
+     *  |---------------------objStreamLength-----------------|-------------jsonTableSegmentLength---------------|
+     *  |---------------------------------------------metaDataOffset---------------------------------------------|
+     */
 
     static {
         Properties properties = new Properties();
         try {
             properties.load(Table.class.getResourceAsStream("/application.properties"));
         } catch (IOException e) {
-            log.warn("读取配置文件时出现问题:{}",ExceptionUtil.getStackTrace(e));
+            log.warn("读取配置文件时出现问题:{}", ExceptionUtil.getStackTrace(e));
             throw new RuntimeException(e);
         }
-        publicFilePath = properties.getProperty("repository.location");
-     //   publicFilePath = "C:\\Users\\nameless\\Desktop\\B_plus_tree";
+        publicFilePath = properties.getProperty("baseRepository.location");
+        //   publicFilePath = "C:\\Users\\nameless\\Desktop\\B_plus_tree";
     }
 
     /**
@@ -198,6 +220,7 @@ public class Table<Index> {
         }
         try (FileChannel fileChannel = new RandomAccessFile(tableFile, "rw").getChannel()) {
             ByteBuffer intBuf = ByteBuffer.allocate(4);
+            //读取索引类（ObjStream）
             fileChannel.read(intBuf);
             intBuf.flip();
             int indexClassObjLen = intBuf.getInt();
@@ -205,16 +228,30 @@ public class Table<Index> {
             ByteBuffer indexClassBuf = ByteBuffer.allocate(indexClassObjLen);
             fileChannel.read(indexClassBuf);
             indexClassBuf.flip();
-            Class<Comparable<?>> index = (Class<Comparable<?>>) objectStreamCodec.decodeBody(indexClassBuf.array(), Class.class);
+            Class<Comparable<?>> index = (Class<Comparable<?>>) ByteCodeLoader.getInstance().loadClass(indexClassBuf.array());
             indexClassBuf.clear();
+
+            //读取数据类（ObjStream）
             fileChannel.read(intBuf);
             intBuf.flip();
-            int jsonTableLen = intBuf.getInt();
+            int dataClassObjLen = intBuf.getInt();
+            intBuf.clear();
+            ByteBuffer dataClassBuf = ByteBuffer.allocate(dataClassObjLen);
+            fileChannel.read(dataClassBuf);
+            dataClassBuf.flip();
+            Class<Comparable<?>> data = (Class<Comparable<?>>)ByteCodeLoader.getInstance().loadClass(dataClassBuf.array());
+            dataClassBuf.clear();
+
+            //读取表数据 （Json）
+            fileChannel.read(intBuf);
+            intBuf.flip();
+            int jsonTableMaxLen = intBuf.getInt();
             Table table = JSON.parseObject(
-                    TableUtils.readToEnd(fileChannel, indexClassObjLen + 4 + 4, jsonTableLen)
+                    TableUtils.readToEnd(fileChannel, indexClassObjLen + dataClassObjLen + (4 + 4) * 2 - 4, jsonTableMaxLen)
                     , Table.class
             );
             table.setIndexClass(index);
+            table.setDataClass(data);
             return table;
         } catch (Exception e) {
             log.error("通过表名获取表实例时出现问题：\n" + ExceptionUtil.getStackTrace(e));
@@ -250,7 +287,7 @@ public class Table<Index> {
      * @param indexSegmentSize 索引段大小
      * @param dataSegmentSize  数据段大小
      */
-    public Table(String tableName, int dataSegmentSize, int indexSegmentSize, int blockSize, Class<Index> indexClass, int metaDataOffset) throws IOException {
+    public Table(String tableName, int dataSegmentSize, int indexSegmentSize, int blockSize, Class<Index> indexClass, Class dataClass, int metaDataOffset) throws IOException {
         this.blockSize = blockSize;
         this.dataPath = publicFilePath + File.separator + tableName + File.separator + "data";
         this.indexPath = publicFilePath + File.separator + tableName + File.separator + "index";
@@ -280,8 +317,9 @@ public class Table<Index> {
         this.availableDataSegmentSlot = new ArrayList<>();
         this.indexHead = 1;
         this.indexClass = (Class<Index>) indexClass;
+        this.dataClass = dataClass;
         this.metaDataOffset = metaDataOffset;
-        writeHeader(dataChannel, indexClass);
+        writeHeader(dataChannel, indexClass, dataClass);
         this.updateTable();
     }
 
@@ -303,26 +341,35 @@ public class Table<Index> {
 
 
     /**
-     * data文件结构：
-     *  |len(index)|index(objStream)|len(table)|table(json)|  空余空间  |dataSegment0 | dataSegment1 | dataSegment2 |...
-     *  |---indexObjStreamLength----|------jsonTableSegmentLength------|
-     *  |-------------------------metaDataOffset-----------------------|
-     */
-
-    /**
      * 写入文件头信息 (metaData)
      *
      * @param channel
      */
-    private void writeHeader(FileChannel channel, Class<?> indexClass) {
+    private void writeHeader(FileChannel channel, Class<?> indexClass, Class<?> dataClass) {
         try {
-            ByteBuffer buf = ByteBuffer.wrap(objectStreamCodec.encodeMessage(indexClass));
+            //写入indexClass
+            ByteBuffer buf = ByteBuffer.wrap(
+                    ByteCodeWriter.getClassBytes(indexClass)
+            );
             ByteBuffer intBuf = ByteBuffer.allocate(4);
-            this.indexObjStreamLength = buf.capacity() + 4;
+            this.objStreamLength = buf.capacity() + 4;
             intBuf.putInt(buf.capacity());
             intBuf.flip();
             channel.write(intBuf);
             channel.write(buf);
+
+            //写入dataClass
+            buf = ByteBuffer.wrap(
+                    ByteCodeWriter.getClassBytes(dataClass)
+            );
+            intBuf = ByteBuffer.allocate(4);
+            this.objStreamLength += buf.capacity() + 4;
+            intBuf.putInt(buf.capacity());
+            intBuf.flip();
+            channel.write(intBuf);
+            channel.write(buf);
+
+            //写入表的其它信息（json）
             buf = ByteBuffer.wrap(JSON.toJSONBytes(this));
             intBuf.clear().putInt(buf.capacity());
             intBuf.flip();
@@ -330,6 +377,7 @@ public class Table<Index> {
             channel.write(intBuf);
             channel.write(buf);
         } catch (Exception e) {
+            e.printStackTrace();
             log.error("写入表头元数据时出现问题：\n" + ExceptionUtil.getStackTrace(e));
         }
     }
@@ -341,9 +389,9 @@ public class Table<Index> {
     public void updateTable() throws IOException {
         ByteBuffer newTableJson = ByteBuffer.wrap(JSON.toJSONBytes(this));
         ByteBuffer len = ByteBuffer.allocate(4);
-        len.putInt(newTableJson.capacity());
-        dataChannel.write(len,indexObjStreamLength);
-        dataChannel.write(newTableJson, indexObjStreamLength + 4);
+        len.putInt(newTableJson.remaining());
+        dataChannel.write(len, objStreamLength);
+        dataChannel.write(newTableJson, objStreamLength + 4);
     }
 
 
@@ -394,7 +442,8 @@ public class Table<Index> {
     public Tree.Block<Index> readBlock(int index, int size) throws IOException {
         Tree.Block<Index> block = JSON.parseObject(
                 new String(TableUtils.readToEnd(indexChannel, getIndexSegmentOffset(index), indexSegmentSize))
-                , new TypeReference<>(indexClass) {}
+                , new TypeReference<>(indexClass) {
+                }
         );
         return block.setBlockSize(size);
     }

@@ -1,6 +1,7 @@
-package com.objsql.common.protocol.util;
+package com.objsql.common.util.protocol;
 
-import com.objsql.common.util.Assert;
+import com.objsql.common.message.HeadMessage;
+import com.objsql.common.util.common.Assert;
 import io.netty.buffer.ByteBuf;
 
 import static com.objsql.common.protocol.constants.ProtocolConstants.*;
@@ -10,7 +11,7 @@ public class HeadCodec {
     public static HeadMessage getHeader(ByteBuf buf) throws IllegalAccessException {
         int magic = buf.readInt();
         byte version = buf.readByte();
-        Assert.isTrue(magic == MAGIC && version == VERSION,"协议及版本号校验失败");
+        Assert.isTrue(magic == MAGIC && version == VERSION,"协议及或版本号校验失败");
         byte serializeType = buf.readByte();
         int sequenceId = buf.readInt();
         byte messageType = buf.readByte();

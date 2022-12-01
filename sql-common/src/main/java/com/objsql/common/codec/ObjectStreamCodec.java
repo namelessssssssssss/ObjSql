@@ -3,7 +3,7 @@ package com.objsql.common.codec;
 import java.io.*;
 
 /**
- * Java序列化编解码器
+ * Java对象流序列化编解码器
  */
 public class ObjectStreamCodec implements Codec {
 

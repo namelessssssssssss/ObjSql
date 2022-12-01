@@ -20,7 +20,7 @@ public class MessageTypes {
     /**
      * 通过数据段号获取数据
      */
-    public static final byte GET_BY_SEG_ID = 4;
+    public static final byte GET_BY_FIELD = 4;
     /**
      * 添加一条数据
      */
@@ -41,4 +41,14 @@ public class MessageTypes {
      * 客户端心跳请求
      */
     public static final byte BEAT = 9;
+
+    /**
+     * 是用户类
+     */
+    public static final byte IS_APP_CLASS = -1;
+
+    /**
+     * 是外部类
+     */
+    public static final byte IS_EXT_CLASS = -2;
 }

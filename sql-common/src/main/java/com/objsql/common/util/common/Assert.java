@@ -1,4 +1,4 @@
-package com.objsql.common.util;
+package com.objsql.common.util.common;
 
 public class Assert {
 

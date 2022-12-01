@@ -46,7 +46,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
     private int size;
 
     /**
-     * 通过新表初始化树结构
+     * 通过表初始化树结构
      */
     public Tree(Table<Index> table) throws IOException {
         this.table = table;
@@ -54,6 +54,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
 
         Leaf<Index> newLeaf = new Leaf<>(table.getBlockSize());
         newLeaf.id = table.addLeaf(newLeaf);
+
         this.head = newLeaf;
         Block<Index> newBlock = new Block<>(table.getBlockSize());
         newBlock.children.add(
@@ -86,9 +87,8 @@ public class Tree<Index> implements Iterable<Byte[]> {
      * 获取一个叶子节点的迭代器，可用于非索引字段的查找及修改。
      */
     @Override
-    public Iterator<Byte[]> iterator() {
-        return null;
-        //return new LeafIterator();
+    public Iterator iterator() {
+        return new LeafIterator();
     }
 
 
@@ -98,6 +98,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
     @lombok.Data
     @Accessors(chain = true)
     public static class Block<Index> {
+
         /**
          * 获取当前索引段的索引，即子节点中排列最靠右，最大的索引(从小到大排列）
          */
@@ -117,13 +118,11 @@ public class Tree<Index> implements Iterable<Byte[]> {
         /**
          * 子节点数据，包含一个Block或Leaf的索引，及其指向的物理页id。
          */
-        //    @JSONField(name = "c")
         public List<Pair<Integer, Index>> children;
 
         /**
          * 标记子节点id是否是数据节点
          */
-        //    @JSONField(name = "if")
         public boolean childrenIsLeaf;
 
         /**
@@ -150,7 +149,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
             boolean isBiggest = true;
             for (; place < children.size(); place++) {
                 //若要添加的节点索引小于当前遍历到的索引
-                if (((Comparable)children.get(place).getE2()).compareTo((Index) index) > 0) {
+                if (((Comparable) children.get(place).getE2()).compareTo((Index) index) > 0) {
                     isBiggest = false;
                     break;
                 }
@@ -200,7 +199,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
         public void replaceIndex(Comparable<Index> old, Pair<Integer, Comparable<Index>> newIndex) {
 
             for (Pair<Integer, Index> index : children) {
-                if (((Comparable)index.getE2()).compareTo((Index) old) == 0) {
+                if (((Comparable) index.getE2()).compareTo((Index) old) == 0) {
                     index.setE1(newIndex.getE1());
                     index.setE2((Index) newIndex.getE2());
                     return;
@@ -228,7 +227,6 @@ public class Tree<Index> implements Iterable<Byte[]> {
             }
         }
 
-
         /**
          * 获取一个block或leaf的id
          *
@@ -254,10 +252,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
 
         @Override
         public String toString() {
-            return "Block{" +
-                    "blockSize=" + blockSize +
-                    ", children=" + children +
-                    '}';
+            return "block.index=" + ( this.children != null && this.children.size() > 0  ? "" : this.children.get(this.children.size() - 1).getE2().toString());
         }
 
     }
@@ -322,7 +317,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
             boolean isReplace = false;
             int compareResult;
             for (; place < indexedData.size(); place++) {
-                compareResult = ((Comparable)indexedData.get(place).getE1()).compareTo(index);
+                compareResult = ((Comparable) indexedData.get(place).getE1()).compareTo(index);
                 //若要添加的节点索引小于当前遍历到的索引
                 if (compareResult > 0) {
                     isBiggest = false;
@@ -384,7 +379,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
             //找到的数据是否是最大的
             boolean isBiggest = false;
             for (; place < indexedData.size(); place++) {
-                if (((Comparable)indexedData.get(place).getE1()).compareTo(index) == 0) {
+                if (((Comparable) indexedData.get(place).getE1()).compareTo(index) == 0) {
                     if (place == indexedData.size() - 1) {
                         isBiggest = true;
                     }
@@ -439,7 +434,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
 
         @Override
         public String toString() {
-            return "Leaf{" + "indexedData=" + indexedData + '}';
+            return "leaf.index=" + ( this.indexedData != null && this.indexedData.size() > 0 ? this.indexedData.get(this.indexedData.size() - 1).getE1().toString() : "");
         }
     }
 
@@ -455,7 +450,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
         if (!initialized) {
             //构造函数创建时，构造了一个空的Leaf节点。第一次插入时手动为该Leaf节点放入数据。
             top = new Block<Index>(table.getBlockSize()).setId(0).setChildrenIsLeaf(true);
-            top.getChildren().add( new Pair(0, index) );
+            top.getChildren().add(new Pair(0, index));
             table.updateBlock(top);
             Leaf<Index> leaf = new Leaf<>(table.getBlockSize());
             leaf.setId(0);
@@ -526,14 +521,26 @@ public class Tree<Index> implements Iterable<Byte[]> {
      * @return 要查找的元素。查找失败，返回null
      */
     public byte[] get(Index index) throws IOException {
-        Leaf<Index> leaf = findLeaf(index);
-        for (Pair<Index, byte[]> data : leaf.indexedData) {
-            if ((toComparable((Index) data.getE1()).compareTo(index) == 0)) {
-                return data.getE2();
+        if(!initialized){
+            synchronized (this) {
+                if(!initialized) {
+                    return null;
+                }
             }
         }
-        throw new NoSuchElementException();
+        try {
+            Leaf<Index> leaf = findLeaf(index);
+            for (Pair<Index, byte[]> data : leaf.indexedData) {
+                if ((toComparable((Index) data.getE1()).compareTo(index) == 0)) {
+                    return data.getE2();
+                }
+            }
+        } catch (NoSuchElementException e) {
+            return null;
+        }
+        return null;
     }
+
 
     /**
      * 将index转换为comparable
@@ -709,6 +716,41 @@ public class Tree<Index> implements Iterable<Byte[]> {
         return (blockOrLeaf instanceof Block ? ((Block) blockOrLeaf).getIndex() : ((Leaf) blockOrLeaf).getIndex());
     }
 
+
+    /**
+     * 以凹入表形式打印树结构
+     */
+    public void printStucture() throws IOException {
+        print(this.top, 0);
+    }
+
+    private void print(Object now, int depth) throws IOException {
+        System.out.println(getGap(depth) + now.toString());
+        if (now instanceof Leaf || now == null) {
+            for (Object pair : ((Leaf) now).getIndexedData()) {
+                System.out.println(getGap(depth + 1) + "data.index =" + ((Pair) pair).getE1());
+            }
+            return;
+        }
+        List<Pair> blockPairs = ((Block) now).children;
+        for (Pair p : blockPairs) {
+            if (!((Block<?>) now).childrenIsLeaf) {
+                print(table.readBlock((Integer) p.getE1(), table.getBlockSize()), depth + 1);
+            } else {
+                print(table.readLeaf((Integer) p.getE1(), table.getBlockSize()), depth + 1);
+            }
+        }
+    }
+
+    private String getGap(int len) {
+        StringBuilder builder = new StringBuilder("   ");
+        while (len-- > 0) {
+            builder.append("   ");
+        }
+        return builder.toString();
+    }
+
+
     /**
      * 通过索引，循环查找其所在范围的叶子页
      *
@@ -777,7 +819,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
         public void remove() {
             try {
                 Tree.this.remove(
-                        (Comparable<Index>) ((Pair<Comparable<Index>, byte[]>)currentLeaf.indexedData.get(placeInCurrentLeaf)).getE1()
+                        (Comparable<Index>) ((Pair<Comparable<Index>, byte[]>) currentLeaf.indexedData.get(placeInCurrentLeaf)).getE1()
                 );
             } catch (IOException e) {
                 throw new RuntimeException(e);

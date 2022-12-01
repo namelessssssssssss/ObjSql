@@ -4,6 +4,8 @@ package com.objsql.client.message;
 import lombok.Data;
 import lombok.experimental.Accessors;
 
+import java.util.List;
+
 @Data
 @Accessors(chain = true)
 public class RawServerResponse {
@@ -19,6 +21,10 @@ public class RawServerResponse {
      * 原始响应信息
      */
     private byte[] rawData;
+    /**
+     * 多段原始响应信息
+     */
+    private List<byte[]> multipartRawData;
     /**
      * 响应信息序列化方式
      */

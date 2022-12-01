@@ -36,8 +36,9 @@ public class ResponseBuilder {
      * 写入一段带长度的数据
      */
     public ResponseBuilder addPart(byte[] bytes) {
+        bytes = bytes == null ? new byte[0] :bytes;
         buf.writeInt(bytes.length).writeBytes(bytes);
-        bytesWritten += ( 4 + bytes.length);
+        bytesWritten += (4 + bytes.length);
         return this;
     }
 

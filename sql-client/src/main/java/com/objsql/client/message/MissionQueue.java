@@ -1,9 +1,8 @@
 package com.objsql.client.message;
 
-import com.objsql.common.util.ExceptionUtil;
+import com.objsql.common.util.common.ExceptionUtil;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -22,19 +21,19 @@ public class MissionQueue {
     /**
      * 暂存的请求对象
      */
-    private static final Map<Integer, ClientRequest> REQUESTS = new HashMap<>();
+    private static final Map<Integer, ClientRequest> REQUESTS = new ConcurrentHashMap<>();
     /**
      * 处理完成的任务结果
      */
-    private static final Map<Integer, HandledServerResponse> RESULTS = new HashMap<>();
+    private static final Map<Integer, HandledServerResponse> RESULTS = new ConcurrentHashMap<>();
     /**
      * 被阻塞线程
      */
-    private static final Map<Integer, CountDownLatch> BLOCKED = new HashMap<>();
+    private static final Map<Integer, CountDownLatch> BLOCKED = new ConcurrentHashMap<>();
     /**
      * 响应后的回调
      */
-    private static final Map<Integer, Consumer<HandledServerResponse>> AFTER_RESPONSE = new HashMap<>();
+    private static final Map<Integer, Consumer<HandledServerResponse>> AFTER_RESPONSE = new ConcurrentHashMap<>();
 
     private static final ExecutorService WORKERS = new ThreadPoolExecutor(
             1, 10, 10, TimeUnit.SECONDS, new ArrayBlockingQueue<>(5)

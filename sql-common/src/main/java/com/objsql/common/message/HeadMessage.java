@@ -1,4 +1,4 @@
-package com.objsql.common.protocol.util;
+package com.objsql.common.message;
 
 import lombok.Data;
 import lombok.RequiredArgsConstructor;

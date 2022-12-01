@@ -3,6 +3,8 @@ package com.objsql.message;
 import lombok.Data;
 import lombok.experimental.Accessors;
 
+import java.util.List;
+
 import static com.objsql.common.protocol.constants.MessageTypes.*;
 
 
@@ -26,8 +28,14 @@ public class ServerResponse {
     private byte serializeType;
 
     private Object index;
-
+    /**
+     * 查询到的对象。
+     */
     private byte[] data;
+    /**
+     * 查询到的对象。当使用非索引字段查询时，可能包含多个结果
+     */
+    private List<byte[]> multipartData;
 
     /**
      * 附加错误信息
@@ -46,8 +54,8 @@ public class ServerResponse {
         return new ServerResponse().setSequenceId(sequenceId).setData(data).setSerializeType(serializeType).setResponseType(GET);
     }
 
-    public static ServerResponse getBySeg(int sequenceId, byte serializeType, byte[] data) {
-        return new ServerResponse().setSequenceId(sequenceId).setData(data).setSerializeType(serializeType).setResponseType(GET_BY_SEG_ID);
+    public static ServerResponse getByField(int sequenceId, byte serializeType, List<byte[]> dataSegments) {
+        return new ServerResponse().setSequenceId(sequenceId).setMultipartData(dataSegments).setSerializeType(serializeType).setResponseType(GET_BY_FIELD);
     }
 
     public static ServerResponse insert(int sequenceId, byte serializeType) {
@@ -70,7 +78,7 @@ public class ServerResponse {
         return new ServerResponse().setSequenceId(sequenceId).setSerializeType(serializeType).setMessage(msg).setResponseType(EXCEPTION);
     }
 
-    public static ServerResponse pong(int sequenceId,byte serializeType) {
+    public static ServerResponse pong(int sequenceId, byte serializeType) {
         return new ServerResponse().setSequenceId(sequenceId).setSerializeType(serializeType).setResponseType(BEAT);
     }
 }

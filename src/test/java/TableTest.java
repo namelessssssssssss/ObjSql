@@ -18,7 +18,7 @@ public class TableTest {
 
     @Test
     void test1() throws IOException {
-        Table table = new Table("server", 2048, 1024, 5,Integer.class,4096);
+        Table table = new Table("server", 2048, 1024, 5,Integer.class,String.class,4096);
         Tree<Integer> dataSource = new Tree<>(table);
         dataSource.add(1,"index = 1".getBytes());
         table.dropTable();
@@ -53,7 +53,7 @@ public class TableTest {
      */
     @Test
     void testAddBlock() throws IOException {
-        Table<Integer> table = new Table<>("test02", 2048, 1024, 5,Integer.class,4096);
+        Table<Integer> table = new Table<>("test02", 2048, 1024, 5,Integer.class,String.class,4096);
         Tree<Integer> dataSource = new Tree<>(table);
         for(int l=0 ; l<100;l++) {
             dataSource.add(l, ("index = "+l).getBytes());
@@ -65,7 +65,7 @@ public class TableTest {
      */
     @Test
      void testAddDisorderly() throws IOException{
-            Table<Long> table = new Table<>("test03", 2048, 1024, 5,Long.class,4096);
+            Table<Long> table = new Table<>("test03", 2048, 1024, 5,Long.class,String.class,4096);
             List<Long> keys = new ArrayList<>();
             Tree<Long> dataSource = new Tree<>(table);
             for(int l=0; l<100;l++) {

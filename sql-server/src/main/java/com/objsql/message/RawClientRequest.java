@@ -31,6 +31,10 @@ public class RawClientRequest implements Serializable {
 
     private byte[] rawIndexClass;
 
+    private byte[] rawDataClass;
+
+    private String fieldName;
+
     private String tableName;
 
     int segmentId;
@@ -53,9 +57,9 @@ public class RawClientRequest implements Serializable {
         return new Create();
     }
 
-    public GetBySeg getBySeg() {
-        this.messageType = GET_BY_SEG_ID;
-        return new GetBySeg();
+    public GetByField getByField() {
+        this.messageType = GET_BY_FIELD;
+        return new GetByField();
     }
 
     public Insert insert() {
@@ -78,7 +82,7 @@ public class RawClientRequest implements Serializable {
         return new Drop();
     }
 
-    public Ping ping(){
+    public Ping ping() {
         this.messageType = BEAT;
         return new Ping();
     }
@@ -147,12 +151,21 @@ public class RawClientRequest implements Serializable {
             return this;
         }
 
+        public Create rawDataClass(byte[] rawDataClass) {
+            RawClientRequest.this.rawDataClass = rawDataClass;
+            return this;
+        }
+
         public byte[] getRawTable() {
             return RawClientRequest.this.rawTable;
         }
 
-        public byte[] getRawIndexClass(){
+        public byte[] getRawIndexClass() {
             return RawClientRequest.this.rawIndexClass;
+        }
+
+        public byte[] getRawDataClass() {
+            return RawClientRequest.this.rawDataClass;
         }
 
         public RawClientRequest finish() {
@@ -160,23 +173,23 @@ public class RawClientRequest implements Serializable {
         }
     }
 
-    public class GetBySeg {
+    public class GetByField {
 
-        private GetBySeg() {
+        private GetByField() {
         }
 
-        public GetBySeg tableName(String tableName) {
+        public GetByField tableName(String tableName) {
             RawClientRequest.this.tableName = tableName;
             return this;
         }
 
-        public GetBySeg segmentId(int segmentId) {
-            RawClientRequest.this.segmentId = segmentId;
+        public GetByField fieldName(String fieldName) {
+            RawClientRequest.this.fieldName = fieldName;
             return this;
         }
 
-        public GetBySeg place(int place) {
-            RawClientRequest.this.place = place;
+        public GetByField rawKey(byte[] rawKey){
+            RawClientRequest.this.rawIndex = rawKey;
             return this;
         }
 
@@ -190,6 +203,13 @@ public class RawClientRequest implements Serializable {
 
         public int getPlace() {
             return RawClientRequest.this.place;
+        }
+
+        public String getFieldName() {
+            return RawClientRequest.this.fieldName;
+        }
+        public byte[] getRawKey(){
+            return RawClientRequest.this.rawIndex;
         }
 
         public RawClientRequest finish() {
@@ -319,7 +339,7 @@ public class RawClientRequest implements Serializable {
         }
     }
 
-    public class Ping{
+    public class Ping {
         public RawClientRequest finish() {
             return RawClientRequest.this;
         }

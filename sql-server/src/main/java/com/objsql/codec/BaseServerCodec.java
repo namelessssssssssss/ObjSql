@@ -5,8 +5,8 @@ import com.objsql.common.codec.Codec;
 import com.objsql.common.codec.JsonCodec;
 import com.objsql.common.codec.ObjectStreamCodec;
 import com.objsql.common.protocol.constants.ProtocolConstants;
-import com.objsql.common.protocol.util.HeadCodec;
-import com.objsql.common.protocol.util.HeadMessage;
+import com.objsql.common.util.protocol.HeadCodec;
+import com.objsql.common.message.HeadMessage;
 import com.objsql.message.RawClientRequest;
 import com.objsql.message.ResponseBuilder;
 import com.objsql.message.ServerResponse;
@@ -27,10 +27,6 @@ import static com.objsql.common.protocol.constants.MessageTypes.*;
 @ChannelHandler.Sharable
 public class BaseServerCodec extends MessageToMessageCodec<ByteBuf, ServerResponse> {
 
-    //校验用头信息
-    private static final int MAGIC = 1324;
-    //版本号
-    private static final byte VERSION = 1;
     //数据体的编解码器
     public static final Map<Byte, Codec> codecMap = new HashMap<>();
 
@@ -71,8 +67,8 @@ public class BaseServerCodec extends MessageToMessageCodec<ByteBuf, ServerRespon
                 return ResponseBuilder.get(buf).getBytesWritten();
             case GET:
                 return ResponseBuilder.get(buf).addPart(serverResponse.getData()).getBytesWritten();
-            case GET_BY_SEG_ID:
-                return -1;
+            case GET_BY_FIELD:
+                return writeMultipartBody(serverResponse,buf);
             case INSERT:
                 return ResponseBuilder.get(buf).getBytesWritten();
             case UPDATE:
@@ -88,6 +84,14 @@ public class BaseServerCodec extends MessageToMessageCodec<ByteBuf, ServerRespon
             default:
                 throw new NoSuchMethodException("不支持的操作类型:" + serverResponse.getResponseType());
         }
+    }
+
+    private int writeMultipartBody(ServerResponse response,ByteBuf buf){
+        ResponseBuilder builder = ResponseBuilder.get(buf);
+        for(byte[] bytes : response.getMultipartData()){
+            builder.addPart(bytes);
+        }
+        return builder.getBytesWritten();
     }
 
     /**
@@ -110,11 +114,15 @@ public class BaseServerCodec extends MessageToMessageCodec<ByteBuf, ServerRespon
         if (commandType == CONNECT) {
             return new RawClientRequest().connect().tableName(readTableNameWithLength(body)).finish();
         } else if (commandType == CREATE) {
-            return new RawClientRequest().create().table(readBodyWithLength(body)).rawIndexClass(readBodyWithLength(body)).finish();
+            return new RawClientRequest().create().table(readBodyWithLength(body)).rawIndexClass(readBodyWithLength(body)).rawDataClass(readBodyWithLength(body)).finish();
         } else if (commandType == GET) {
             return new RawClientRequest().get().tableName(readTableNameWithLength(body)).index(readKeyWithLength(body)).finish();
-        } else if (commandType == GET_BY_SEG_ID) {
-            return new RawClientRequest().getBySeg().tableName(readTableNameWithLength(body)).segmentId(body.readInt()).place(body.readInt()).finish();
+        } else if (commandType == GET_BY_FIELD) {
+            return new RawClientRequest().getByField()
+                    .tableName(readTableNameWithLength(body))
+                    .rawKey(readBodyWithLength(body))
+                    .fieldName(new String(readBodyWithLength(body), StandardCharsets.UTF_8))
+                    .finish();
         } else if (commandType == INSERT) {
             return new RawClientRequest().insert().tableName(readTableNameWithLength(body)).rawIndex(readKeyWithLength(body)).data(readBodyWithLength(body)).finish();
         } else if (commandType == UPDATE) {

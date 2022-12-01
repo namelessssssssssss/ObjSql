@@ -6,10 +6,10 @@ import java.io.Serializable;
 
 @lombok.Data
 @Accessors(chain = true)
-public class TableCreateParam<Index> implements Serializable {
-    private Class<Comparable<Index>> indexClass;
+public class TableCreateParam<Index,Data> implements Serializable {
+    private Class<? extends Comparable<Index>> indexClass;
 
-    private Class<?> dataClass;
+    private Class<Data> dataClass;
 
     private String tableName;
 
@@ -21,15 +21,29 @@ public class TableCreateParam<Index> implements Serializable {
 
     private int metaDataOffset;
 
-    private byte serializeType;
+    private byte indexSerializeType;
 
-    public TableCreateParam(Class<? extends Comparable<Index>> indexClass, Class<?> dataClass, String tableName, int dataSegmentSize, int indexSegmentSize, int blockSize, int metaDataOffset) {
-        this.indexClass = (Class<Comparable<Index>>) indexClass;
+    private byte dataSerializeType;
+
+    public TableCreateParam(Class<? extends Comparable<Index>> indexClass, Class<Data> dataClass, String tableName, int dataSegmentSize, int indexSegmentSize, int blockSize, int metaDataOffset) {
+        this.indexClass =  indexClass;
         this.dataClass = dataClass;
         this.tableName = tableName;
         this.dataSegmentSize = dataSegmentSize;
         this.indexSegmentSize = indexSegmentSize;
         this.blockSize = blockSize;
         this.metaDataOffset = metaDataOffset;
+    }
+
+    public TableCreateParam(Class<? extends Comparable<Index>> indexClass, Class<Data> dataClass, String tableName, int dataSegmentSize, int indexSegmentSize, int blockSize, int metaDataOffset, byte indexSerializeType, byte dataSerializeType) {
+        this.indexClass =indexClass;
+        this.dataClass = dataClass;
+        this.tableName = tableName;
+        this.dataSegmentSize = dataSegmentSize;
+        this.indexSegmentSize = indexSegmentSize;
+        this.blockSize = blockSize;
+        this.metaDataOffset = metaDataOffset;
+        this.indexSerializeType = indexSerializeType;
+        this.dataSerializeType = dataSerializeType;
     }
 }

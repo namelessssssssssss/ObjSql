@@ -9,7 +9,7 @@ import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 public class ProtocolFrameDecoder extends LengthFieldBasedFrameDecoder {
 
     public ProtocolFrameDecoder(){
-        this(4096,
+        this(40960,
                 ProtocolConstants.BODY_LENGTH_OFFSET,
                 ProtocolConstants.BODY_LENGTH_MSG_LENGTH,
                 0,
