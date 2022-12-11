@@ -36,7 +36,7 @@ public class MissionQueue {
     private static final Map<Integer, Consumer<HandledServerResponse>> AFTER_RESPONSE = new ConcurrentHashMap<>();
 
     private static final ExecutorService WORKERS = new ThreadPoolExecutor(
-            1, 10, 10, TimeUnit.SECONDS, new ArrayBlockingQueue<>(5)
+            1, 10, 100, TimeUnit.SECONDS, new ArrayBlockingQueue<>(50)
     );
 
     private static final AtomicInteger sequenceId = new AtomicInteger();

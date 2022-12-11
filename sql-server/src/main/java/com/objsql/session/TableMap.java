@@ -13,7 +13,7 @@ import java.util.Map;
 public class TableMap {
 
     /**
-     * 活动的数据库实例
+     * 活动的表实例
      */
     private static final Map<String, Pair<Table<?>, Tree<?>>> tables = new HashMap<>();
 

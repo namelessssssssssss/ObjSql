@@ -38,9 +38,9 @@ public class BytesReader {
     }
 
     /**
-     * 读取一段带长度的数据，以UTF-16解码为String
+     * 读取一段带长度的数据，以UTF-8解码为String
      */
     public static String readStringPart(ByteBuf buf) {
-        return readStringPart(buf, StandardCharsets.UTF_16);
+        return readStringPart(buf, StandardCharsets.UTF_8);
     }
 }

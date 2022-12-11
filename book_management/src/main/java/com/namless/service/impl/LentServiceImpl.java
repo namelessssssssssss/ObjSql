@@ -47,7 +47,7 @@ public class LentServiceImpl implements LentService {
         for (Lent record : records) {
             if (record.getDocCode().equals(docCode)) {
                 Book book = bookRepository.get(record.getDocCode());
-                bookRepository.update(book.setRemains(book.getRemains() - 1));
+                bookRepository.update(book.setRemains(book.getRemains() + 1));
                 return true;
             }
         }

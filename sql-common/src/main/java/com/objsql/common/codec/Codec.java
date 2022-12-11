@@ -8,7 +8,7 @@ public interface Codec {
     byte[] encodeMessage(Object body) throws Exception;
 
 
-    Object decodeBody(byte[] bytes, Class... msgAndGenericClass) throws Exception;
+    Object decodeBody(byte[] bytes, Class... messageAndGenericClass) throws Exception;
 
     int getSerializeType();
 

@@ -72,51 +72,71 @@ public class BaseRepository<Index, Data> {
 
     private void checkResponse(HandledServerResponse response, String operationType) {
         if (response != null && response.getErrorMessage() == null) {
-            log.debug("对表" + tableName + "的操作[" + operationType + "]成功");
+//            log.debug("对表" + tableName + "的操作[" + operationType + "]成功");
         } else {
             log.warn("对表" + tableName + "的操作[" + operationType + "]失败，原因：" + ((response == null) ? "未知原因" : response.getErrorMessage()));
         }
     }
 
+    /**
+     * 建表
+     */
     private void create(TableCreateParam<Index,Data> param){
         HandledServerResponse response =MissionQueue.submit(new ClientRequest().create().table(param).finish());
         checkResponse(response,"创建");
     }
 
+    /**
+     * 连接到现有表
+     */
     private HandledServerResponse connect() {
         HandledServerResponse response = MissionQueue.submit(new ClientRequest().connect().tableName(tableName).finish());
         checkResponse(response, "连接");
         return response;
     }
 
+    /**
+     * 插入一条数据
+     */
     public void add(Index index, Data data) {
         HandledServerResponse response = MissionQueue.submit(new ClientRequest().insert().tableName(tableName).key(index).data(data).finish());
         checkResponse(response, "添加");
     }
 
+    /**
+     * 查找一条数据
+     */
     public Data get(Index index) {
         HandledServerResponse response = MissionQueue.submit(new ClientRequest().get().tableName(tableName).index(index).dataClass(this.dataClass).finish());
         checkResponse(response, "查找");
         return (Data) response.getData();
     }
 
+    /**
+     * 按字段查找多条数据（非索引）
+     */
     public List<Data> getByField(Object key, Field field){
         HandledServerResponse response = MissionQueue.submit(new ClientRequest().getByField().tableName(tableName).dataClass(dataClass).field(field).key(key).finish());
         checkResponse(response,"非索引查找");
         return (List<Data>) response.getDataList();
     }
 
+    /**
+     * 按字段查找多条数据（非索引）
+     */
     public List<Data> getByField(Object key,String fieldName) throws NoSuchFieldException {
         HandledServerResponse response = MissionQueue.submit(new ClientRequest().getByField().tableName(tableName).dataClass(dataClass).field(dataClass.getDeclaredField(fieldName)).key(key).finish());
         checkResponse(response,"非索引查找");
         return (List<Data>) response.getDataList();
     }
 
-
+    /**
+     * 删除一条数据
+     */
     public void delete(Index index) {
         HandledServerResponse response = MissionQueue.submit(new ClientRequest().delete().tableName(tableName).key(index).finish());
         checkResponse(response, "删除");
     }
 
-    public interface Getter<T,R> extends Function<T,R>{}
+
 }

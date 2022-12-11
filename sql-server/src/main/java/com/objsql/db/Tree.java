@@ -44,6 +44,16 @@ public class Tree<Index> implements Iterable<Byte[]> {
     private final Leaf<Index> head;
 
     /**
+     * 目前所有叶子节点中元素的数量
+     */
+    private int size;
+
+    /**
+     * 树结构是否完成初始化
+     */
+    private boolean initialized = false;
+
+    /**
      * 数据节点缓存
      */
     private final List<Block<Index>> blockCache = new ArrayList<>();
@@ -53,34 +63,35 @@ public class Tree<Index> implements Iterable<Byte[]> {
      */
     private final List<Leaf<Index>> leafCache = new ArrayList<>();
 
+    /**
+     * 缓存清理线程池
+     */
     private final ScheduledThreadPoolExecutor cleaner = new ScheduledThreadPoolExecutor(2);
 
     /**
-     * 自动清理缓存
+     * 自动清理缓存：清理最新产生的缓存
+     * 最新产生的缓存更有可能是靠近叶子的节点，而靠近根的节点被访问频率更高，因此从队尾开始清理
      */
     {
         cleaner.scheduleAtFixedRate(()->{
-            //每次清理 0.5%的缓存
+            //每次清理0.5%的索引缓存
             int size = blockCache.size()/200;
             while (size>0) {
-                blockCache.remove(0);
+                blockCache.remove(blockCache.size()-1);
                 size--;
             }
         },5000,5000, TimeUnit.MILLISECONDS);
         cleaner.scheduleAtFixedRate(()->{
-            //每次清理0.5%缓存
-            int size = leafCache.size()/200;
+            //每次清理5%的数据缓存
+            int size = leafCache.size()/20;
             while (size>0) {
-                leafCache.remove(0);
+                leafCache.remove(leafCache.size()-1);
                 size--;
             }
         }, 2000,2000,TimeUnit.MILLISECONDS);
     }
 
-    /**
-     * 目前所有叶子节点中元素的数量
-     */
-    private int size;
+
 
     /**
      * 通过表初始化树结构
@@ -152,7 +163,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
         public int blockSize;
 
         /**
-         * 子节点数据，包含一个Block或Leaf的索引，及其指向的物理页id。
+         * 子节点数据，包含一个Block或Leaf的索引，及其子节点的弱引用。
          */
         @JSONField(serialize = true)
         public List<Pair<SegmentReference, Index>> children;
@@ -189,6 +200,8 @@ public class Tree<Index> implements Iterable<Byte[]> {
                 if (((Comparable) children.get(place).getE2()).compareTo((Index) index) > 0) {
                     isBiggest = false;
                     break;
+
+                    
                 }
             }
             Pair<SegmentReference, Comparable<Index>> newElement = new Pair<>();
@@ -216,7 +229,6 @@ public class Tree<Index> implements Iterable<Byte[]> {
                 newBlock.id = tree.table.addBlock(newBlock);
                 children = sublist(children, 0, blockSize / 2);
                 //缓存产生的新块
-                tree.blockCache.add(this);
                 tree.blockCache.add(newBlock);
                 //返回原有段的更新后的索引，及新段的编号及索引
                 return new UpdateElement(new Pair<>(new SegmentReference(this), this.getIndex()), new Pair<>(new SegmentReference(newBlock), newBlock.getIndex()));
@@ -315,27 +327,29 @@ public class Tree<Index> implements Iterable<Byte[]> {
          */
         //    @JSONField(name = "i")
         public int id;
+
         /**
          * 叶子节点大小
          */
         @JSONField(serialize = false)
         public int leafSize;
+
         /**
          * 上一个数据段号
          */
         //  @JSONField(name = "p")
         public Integer prev;
+
         /**
          * 下一个数据段号
          */
         //  @JSONField(name = "n")
         public Integer next;
+
         /**
          * 单条数据与其对应的索引
          */
         //   @JSONField(name = "d")
-
-
         public List<Pair<Index, byte[]>> indexedData;
 
         public byte[] serialize() {
@@ -479,7 +493,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
         }
     }
 
-    private boolean initialized = false;
+
 
     /**
      * 添加一个元素。索引必须实现Comparable接口。
@@ -704,7 +718,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
                 }
             }
         }
-        //正常情况下，应在之前的循环返回。
+        //正常情况下，应在之前返回
         throw new IllegalStateException();
     }
 
@@ -717,11 +731,11 @@ public class Tree<Index> implements Iterable<Byte[]> {
          */
         public boolean needDelete = false;
         /**
-         * 旧索引要修改为的新索引,<新索引物理段，新索引值>
+         * 旧索引要修改为的新索引,<新索引段，新索引值>
          */
         public Pair<SegmentReference, Comparable<?>> newIndex;
         /**
-         * 需要更新的旧索引,<索引物理段，更新后的新索引值>
+         * 需要更新的旧索引,<旧索引段，更新后的新索引值>
          */
         public Pair<SegmentReference, Comparable<?>> updateIndex;
 
@@ -795,7 +809,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
 
 
     /**
-     * 通过索引，循环查找其所在范围的叶子页
+     * 通过索引，查找其所在范围的叶子页
      *
      * @param index 索引
      * @return 可能所在的叶子页。子叶可以不包含该索引。
@@ -873,7 +887,7 @@ public class Tree<Index> implements Iterable<Byte[]> {
         public void remove() {
             try {
                 Tree.this.remove(
-                        (Comparable<Index>) ((Pair<Comparable<Index>, byte[]>) currentLeaf.indexedData.get(placeInCurrentLeaf)).getE1()
+                        (Comparable<Index>) ( (Pair<Comparable<Index>, byte[]>) currentLeaf.indexedData.get(placeInCurrentLeaf)).getE1()
                 );
             } catch (IOException e) {
                 throw new RuntimeException(e);

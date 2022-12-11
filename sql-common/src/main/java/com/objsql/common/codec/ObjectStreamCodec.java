@@ -19,13 +19,13 @@ public class ObjectStreamCodec implements Codec {
     }
 
     @Override
-    public Object decodeBody(byte[] bytes,Class... genericClass) throws IOException,ClassNotFoundException {
+    public Object decodeBody(byte[] bytes,Class... messageAndGenericClass) throws IOException,ClassNotFoundException {
 
         ObjectInputStream in = new ObjectInputStream(
                 new ByteArrayInputStream(bytes)
         );
         Object res = in.readObject();
-        if (!res.getClass().equals(genericClass[0])) {
+        if (!res.getClass().equals(messageAndGenericClass[0])) {
             throw new RuntimeException("转换后的类型与提供的类型不符");
         } else {
             return res;

@@ -114,11 +114,10 @@ public class ClientRequestHandler extends SimpleChannelInboundHandler<RawClientR
         Table table = TableMap.getTable(request.get().getTableName());
         Codec dataCodec = BaseServerCodec.codecMap.get(table.getDataSerializeType());
 
-
         String fieldName = request.getByField().getFieldName();
         Field field = table.getDataClass().getDeclaredField(fieldName);
         field.setAccessible(true);
-        Object key = dataCodec.decodeBody(request.getByField().getRawKey(), field.getType());
+        Comparable key = (Comparable) dataCodec.decodeBody(request.getByField().getRawKey(), field.getType());
 
         Iterator iterator = tree.iterator();
         Object res = null;
@@ -128,7 +127,7 @@ public class ClientRequestHandler extends SimpleChannelInboundHandler<RawClientR
         while (iterator.hasNext()) {
             byte[] data = (byte[]) iterator.next();
             Object dataObj = dataCodec.decodeBody(data, table.getDataClass());
-            if (field.get(dataObj).equals(key)) {
+            if (key.compareTo(field.get(dataObj)) == 0) {
                 results.add(data);
             }
         }

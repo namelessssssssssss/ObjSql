@@ -2,6 +2,12 @@ package com.objsql.common.protocol.constants;
 
 public class ProtocolConstants {
 
+    //校验用头信息
+    public static final int MAGIC = 1919810;
+
+    //版本号
+    public static final byte VERSION = 1;
+
     public static final int MAGIC_LEN = 4;
 
     public static final int VERSION_LEN = 1;
@@ -27,8 +33,5 @@ public class ProtocolConstants {
      */
     public static final int HEADER_LENGTH = BODY_LENGTH_OFFSET + BODY_LENGTH_MSG_LENGTH;
 
-    //校验用头信息
-    public static final int MAGIC = 1919810;
-    //版本号
-    public static final byte VERSION = 1;
+
 }

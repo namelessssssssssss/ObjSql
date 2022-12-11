@@ -11,7 +11,8 @@ class TreeTest {
 
     @Test
     void test() throws IOException {
-        new Tree<>("test04").printStucture();
+        new Tree<>("BookRepository").printStucture();
+        new Tree<>("LentRepository").printStucture();
     }
 
 

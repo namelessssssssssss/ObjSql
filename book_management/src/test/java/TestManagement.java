@@ -4,10 +4,11 @@ import com.namless.repository.BookRepository;
 import com.namless.repository.LentRepository;
 import com.namless.service.impl.BookServiceImpl;
 import com.namless.service.impl.LentServiceImpl;
-import com.objsql.client.datasource.BaseRepository;
 import com.objsql.common.util.common.Assert;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 public class TestManagement {
 
@@ -42,26 +43,33 @@ public class TestManagement {
          bookService.addNewBook(new Book().setBookName("JavaWeb高级编程").setAuthor("Nicholas S.Williams").setDocCode(4L).setRemains(1).setAll(1));
          bookService.addNewBook(new Book().setBookName("深入理解Java虚拟机").setAuthor("周志明").setDocCode(5L).setRemains(1).setAll(1));
 
-        System.err.println("添加了1000本库存");
-        for(int k=0;k<1000;k++) {
+        System.err.println("每本书再添加6本库存");
+        for(int k=0;k<30;k++) {
            bookService.addNewBook(new Book().setDocCode(new Long(k % 5 +1)));
         }
 
 
-        System.err.println("查询书籍库存");
+        System.err.println("查询添加的书籍库存");
         for(long k = 1L; k<6L; k++) {
-            System.err.println(bookService.getBook(k));
+            Book book = bookService.getBook(k);
+            System.err.println(k);
+            //若校验失败，会抛出异常导致测试失败
+            //每本书此时应有7本库存
+            Assert.isTrue(book.getRemains()== 7 && book.getAll() == 7,"书籍数量不正确");
         }
 
-        System.err.println("模拟4个用户共借阅100本书籍");
-        for(int k = 0;k<100;k++){
+        System.err.println("模拟4个用户共借阅20本书籍");
+        for(int k = 0;k<20;k++){
             //设置4个不同的借阅者
             lentService.addNewRecord(new Lent().setDocCode( new Long(k % 6 +1)).setBorrowerName("borrower-"+(k % 4)).setId(k));
         }
 
         System.err.println("根据借阅者名称查询借阅记录");
-        for(int k = 0;k<100;k++){
-            System.err.println(lentService.getRecord("borrower-"+(k % 4)));
+        for(int k = 0;k<20;k++){
+            List<Lent> lent = lentService.getRecord("borrower-"+(k % 4));
+            //每个用户应有5条借阅记录
+            Assert.isTrue(lent.size() == 5,"用户借阅书籍数量不正确");
+            System.err.println(lent);
         }
 
         System.err.println("查询书籍库存：");
@@ -70,19 +78,23 @@ public class TestManagement {
         }
 
         System.err.println("归还借阅书籍");
-        for(int k = 0;k<100;k++){
+        for(int k = 0;k<20;k++){
             //设置4个不同的借阅者
             lentService.removeRecord("borrower-"+(k % 4),new Long(k % 6 +1));
         }
 
         System.err.println("查询书籍库存：");
         for(long k = 1L; k<6L; k++) {
-            System.err.println(bookService.getBook(k));
+            Book book = bookService.getBook(k);
+            System.err.println(k);
+            //归还所有书籍后，每本书应有7本库存
+            Assert.isTrue(book.getRemains()== 7 && book.getAll() == 7,"书籍数量不正确");
         }
 
         //删除一本书籍
         bookService.remove(4L);
         Book book = bookService.getBook(4L);
+        //删除书籍后，不应再查询的到
         Assert.isTrue(book == null,"删除失败");
         System.err.println("删除成功");
 

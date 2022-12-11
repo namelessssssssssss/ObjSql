@@ -4,7 +4,6 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 
 @Data
-@RequiredArgsConstructor
 public class HeadMessage {
     private final Integer magic;
     private final Byte version;

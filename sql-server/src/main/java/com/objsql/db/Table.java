@@ -174,11 +174,10 @@ public class Table<Index> {
      */
     private byte dataSerializeType;
 
-
     /**
-     * 索引、数据Class序列化后所占长度
+     * 索引、数据类型的字节码所占长度
      */
-    private int objStreamLength;
+    private int objByteCodeLength;
 
     /**
      * 表实例json序列化后所占长度
@@ -192,9 +191,9 @@ public class Table<Index> {
 
     /**
      * data文件结构：
-     *  |len(index)|index(objStream)|len(data)|data(objStream)|len(jsonTableSegmentLentgh)|table(json)|  空余空间  | dataSegment0 | dataSegment1 | dataSegment2 |...
-     *  |---------------------objStreamLength-----------------|-------------jsonTableSegmentLength---------------|
-     *  |---------------------------------------------metaDataOffset---------------------------------------------|
+     *  |len(index)|index(byteCode)|len(data)|data(byteCode)|len(jsonTableSegmentLentgh)|table(json)|  空余空间 | dataSegment0 | dataSegment1 | dataSegment2 |...
+     *  |-------------------objByteCodeLength---------------|-------------jsonTableSegmentLength---------------|
+     *  |--------------------------------------------metaDataOffset--------------------------------------------|
      */
 
     static {
@@ -206,7 +205,10 @@ public class Table<Index> {
             throw new RuntimeException(e);
         }
         publicFilePath = properties.getProperty("baseRepository.location");
-        //   publicFilePath = "C:\\Users\\nameless\\Desktop\\B_plus_tree";
+        if(!new File(publicFilePath).isDirectory()){
+                log.warn("无法读取指定的仓库路径，使用默认路径");
+                publicFilePath = new File("").getAbsolutePath();
+        }
     }
 
     /**
@@ -348,14 +350,13 @@ public class Table<Index> {
      *
      * @param channel
      */
-    private void writeHeader(FileChannel channel, Class<?> indexClass, Class<?> dataClass) {
-        try {
+    private void writeHeader(FileChannel channel, Class<?> indexClass, Class<?> dataClass) throws IOException {
             //写入indexClass
             ByteBuffer buf = ByteBuffer.wrap(
                     ByteCodeWriter.getClassBytes(indexClass)
             );
             ByteBuffer intBuf = ByteBuffer.allocate(4);
-            this.objStreamLength = buf.capacity() + 4;
+            this.objByteCodeLength = buf.capacity() + 4;
             intBuf.putInt(buf.capacity());
             intBuf.flip();
             channel.write(intBuf);
@@ -366,7 +367,7 @@ public class Table<Index> {
                     ByteCodeWriter.getClassBytes(dataClass)
             );
             intBuf = ByteBuffer.allocate(4);
-            this.objStreamLength += buf.capacity() + 4;
+            this.objByteCodeLength += buf.capacity() + 4;
             intBuf.putInt(buf.capacity());
             intBuf.flip();
             channel.write(intBuf);
@@ -379,10 +380,7 @@ public class Table<Index> {
             buf.flip();
             channel.write(intBuf);
             channel.write(buf);
-        } catch (Exception e) {
-            e.printStackTrace();
-            log.error("写入表头元数据时出现问题：\n" + ExceptionUtil.getStackTrace(e));
-        }
+
     }
 
 
@@ -393,8 +391,8 @@ public class Table<Index> {
         ByteBuffer newTableJson = ByteBuffer.wrap(JSON.toJSONBytes(this));
         ByteBuffer len = ByteBuffer.allocate(4);
         len.putInt(newTableJson.remaining());
-        dataChannel.write(len, objStreamLength);
-        dataChannel.write(newTableJson, objStreamLength + 4);
+        dataChannel.write(len, objByteCodeLength);
+        dataChannel.write(newTableJson, objByteCodeLength + 4);
     }
 
 

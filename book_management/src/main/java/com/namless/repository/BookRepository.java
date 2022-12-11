@@ -1,7 +1,6 @@
 package com.namless.repository;
 
 import com.namless.entity.po.Book;
-import com.objsql.client.datasource.AbstractRepository;
 import com.objsql.client.datasource.BaseRepository;
 import com.objsql.common.message.TableCreateParam;
 
@@ -33,7 +32,6 @@ public class BookRepository extends BaseRepository<Long,Book> {
             return true;
         }
     }
-
 
     /**
      * 通过文献名称查询文献

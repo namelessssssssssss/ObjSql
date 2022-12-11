@@ -29,6 +29,7 @@ import static com.objsql.common.protocol.constants.MessageTypes.*;
 @ChannelHandler.Sharable
 public class BaseClientCodec extends MessageToMessageCodec<ByteBuf, ClientRequest> {
 
+
     public static final Map<Byte, Codec> codecMap = new HashMap<>();
 
     static {

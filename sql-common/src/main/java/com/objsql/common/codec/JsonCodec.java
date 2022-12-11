@@ -17,11 +17,11 @@ public class JsonCodec implements Codec {
     }
 
     @Override
-    public Object decodeBody(byte[] bytes,Class... genericClass) {
-        if (genericClass.length == 1) {
-            return JSON.parseObject(bytes, genericClass[0]);
+    public Object decodeBody(byte[] bytes,Class... messageAndGenericClass) {
+        if (messageAndGenericClass.length == 1) {
+            return JSON.parseObject(bytes, messageAndGenericClass[0]);
         }
-        return JSON.parseObject(Arrays.toString(bytes), new TypeReference<>(genericClass) {
+        return JSON.parseObject(Arrays.toString(bytes), new TypeReference<>(messageAndGenericClass) {
         });
     }
 

@@ -5,7 +5,6 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
 
-import java.io.File;
 import java.io.FileInputStream;
 import java.nio.charset.StandardCharsets;
 
