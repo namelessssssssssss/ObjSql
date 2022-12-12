@@ -12,8 +12,6 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.util.*;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-
 /**
  * B+树存储结构
  *
@@ -73,22 +71,22 @@ public class Tree<Index> implements Iterable<Byte[]> {
      * 最新产生的缓存更有可能是靠近叶子的节点，而靠近根的节点被访问频率更高，因此从队尾开始清理
      */
     {
-        cleaner.scheduleAtFixedRate(()->{
-            //每次清理0.5%的索引缓存
-            int size = blockCache.size()/200;
-            while (size>0) {
-                blockCache.remove(blockCache.size()-1);
-                size--;
-            }
-        },5000,5000, TimeUnit.MILLISECONDS);
-        cleaner.scheduleAtFixedRate(()->{
-            //每次清理5%的数据缓存
-            int size = leafCache.size()/20;
-            while (size>0) {
-                leafCache.remove(leafCache.size()-1);
-                size--;
-            }
-        }, 2000,2000,TimeUnit.MILLISECONDS);
+//        cleaner.scheduleAtFixedRate(()->{
+//            //每次清理0.5%的索引缓存
+//            int size = blockCache.size()/200;
+//            while (size>0) {
+//                blockCache.remove(blockCache.size()-1);
+//                size--;
+//            }
+//        },5000,5000, TimeUnit.MILLISECONDS);
+//        cleaner.scheduleAtFixedRate(()->{
+//            //每次清理5%的数据缓存
+//            int size = leafCache.size()/20;
+//            while (size>0) {
+//                leafCache.remove(leafCache.size()-1);
+//                size--;
+//            }
+//        }, 2000,2000,TimeUnit.MILLISECONDS);
     }
 
 
@@ -200,8 +198,6 @@ public class Tree<Index> implements Iterable<Byte[]> {
                 if (((Comparable) children.get(place).getE2()).compareTo((Index) index) > 0) {
                     isBiggest = false;
                     break;
-
-                    
                 }
             }
             Pair<SegmentReference, Comparable<Index>> newElement = new Pair<>();
@@ -443,9 +439,6 @@ public class Tree<Index> implements Iterable<Byte[]> {
                 }
             }
             if (found) {
-//                if (isBiggest && this.indexedData.size() > 1) {
-//                    this.childRIndex = this.indexedData.get(place - 1).getE1();
-//                }
                 this.indexedData.remove(place);
                 if (this.indexedData.isEmpty()) {
                     if (this.prev != null) {

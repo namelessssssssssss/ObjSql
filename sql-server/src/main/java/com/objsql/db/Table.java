@@ -292,7 +292,7 @@ public class Table<Index> {
      * @param indexSegmentSize 索引段大小
      * @param dataSegmentSize  数据段大小
      */
-    public Table(String tableName, int dataSegmentSize, int indexSegmentSize, int blockSize, Class<Index> indexClass, Class dataClass, int metaDataOffset) throws IOException {
+    public Table(String tableName, int dataSegmentSize, int indexSegmentSize, int blockSize, Class<Index> indexClass, Class dataClass,byte[] rawIndexClass,byte[] rawDataClass,int metaDataOffset) throws IOException {
         this.blockSize = blockSize;
         this.dataPath = publicFilePath + File.separator + tableName + File.separator + "data";
         this.indexPath = publicFilePath + File.separator + tableName + File.separator + "index";
@@ -324,7 +324,7 @@ public class Table<Index> {
         this.indexClass = (Class<Index>) indexClass;
         this.dataClass = dataClass;
         this.metaDataOffset = metaDataOffset;
-        writeHeader(dataChannel, indexClass, dataClass);
+        writeHeader(dataChannel,rawIndexClass,rawDataClass);
         this.updateTable();
     }
 
@@ -350,11 +350,9 @@ public class Table<Index> {
      *
      * @param channel
      */
-    private void writeHeader(FileChannel channel, Class<?> indexClass, Class<?> dataClass) throws IOException {
+    private void writeHeader(FileChannel channel, byte[] rawIndexClass, byte[] rawDataClass) throws IOException {
             //写入indexClass
-            ByteBuffer buf = ByteBuffer.wrap(
-                    ByteCodeWriter.getClassBytes(indexClass)
-            );
+            ByteBuffer buf = ByteBuffer.wrap(rawIndexClass);
             ByteBuffer intBuf = ByteBuffer.allocate(4);
             this.objByteCodeLength = buf.capacity() + 4;
             intBuf.putInt(buf.capacity());
@@ -363,9 +361,7 @@ public class Table<Index> {
             channel.write(buf);
 
             //写入dataClass
-            buf = ByteBuffer.wrap(
-                    ByteCodeWriter.getClassBytes(dataClass)
-            );
+            buf = ByteBuffer.wrap(rawDataClass);
             intBuf = ByteBuffer.allocate(4);
             this.objByteCodeLength += buf.capacity() + 4;
             intBuf.putInt(buf.capacity());

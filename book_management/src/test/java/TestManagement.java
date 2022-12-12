@@ -18,12 +18,10 @@ public class TestManagement {
 
 
     @BeforeAll
-    static void startServer(){
-
-    }
+    static void startServer(){}
 
     @Test
-    void testBookManagement() throws IllegalAccessException {
+    void testBookManagement() {
 
         //创建新表
         new BookRepository(2048,1024,6,20480);
@@ -45,7 +43,7 @@ public class TestManagement {
 
         System.err.println("每本书再添加6本库存");
         for(int k=0;k<30;k++) {
-           bookService.addNewBook(new Book().setDocCode(new Long(k % 5 +1)));
+           bookService.addNewBook(new Book().setDocCode((long) (k % 5 + 1)));
         }
 
 
@@ -61,7 +59,7 @@ public class TestManagement {
         System.err.println("模拟4个用户共借阅20本书籍");
         for(int k = 0;k<20;k++){
             //设置4个不同的借阅者
-            lentService.addNewRecord(new Lent().setDocCode( new Long(k % 6 +1)).setBorrowerName("borrower-"+(k % 4)).setId(k));
+            lentService.addNewRecord(new Lent().setDocCode((long) (k % 5 + 1)).setBorrowerName("borrower-"+(k % 4)).setId(k));
         }
 
         System.err.println("根据借阅者名称查询借阅记录");
@@ -80,7 +78,7 @@ public class TestManagement {
         System.err.println("归还借阅书籍");
         for(int k = 0;k<20;k++){
             //设置4个不同的借阅者
-            lentService.removeRecord("borrower-"+(k % 4),new Long(k % 6 +1));
+            lentService.removeRecord("borrower-"+(k % 4), (long) (k % 5 + 1));
         }
 
         System.err.println("查询书籍库存：");
@@ -106,6 +104,19 @@ public class TestManagement {
         System.err.println(bookService.getByAuthor("Nicholas S.Williams"));
         System.err.println(bookService.getByAuthor("周志明"));
 
+    }
+
+
+    @Test
+    void testRandomAdd() throws IllegalAccessException {
+        new BookRepository(2048,1024,6,20480);
+        bookService = new BookServiceImpl();
+
+        for(int k=0;k<10000;k++){
+            Long key = Math.round(Math.random() * 10000);
+            bookService.addNewBook(new Book().setBookName("book-"+k).setAuthor("auth-"+k).setDocCode(key).setAll(1).setRemains(1));
+        }
+        bookService.getBook(1L);
     }
 
     @Test

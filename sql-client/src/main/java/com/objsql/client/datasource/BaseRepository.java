@@ -51,7 +51,7 @@ public class BaseRepository<Index, Data> {
             this.indexClass = (Class<Comparable<Index>>) indexClass;
             this.dataClass = dataClass;
             HandledServerResponse response = connect();
-            this.serializeType = response.getSerializeType();
+            this.serializeType = (byte)0;
     }
 
     /**

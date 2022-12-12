@@ -93,7 +93,8 @@ public class ClientRequestHandler extends SimpleChannelInboundHandler<RawClientR
                 (Class<? extends Comparable<?>>) classLoader.loadClass(rawIndexClass);
         Class<?> dataClass =
                 (Class<?>) classLoader.loadClass(rawDataClass);
-        new Table<>(param.getTableName(), param.getDataSegmentSize(), param.getIndexSegmentSize(), param.getBlockSize(), indexClass, dataClass, param.getMetaDataOffset());
+        new Table<>(param.getTableName(), param.getDataSegmentSize(), param.getIndexSegmentSize(), param.getBlockSize(),
+                indexClass, dataClass, rawIndexClass,rawDataClass,param.getMetaDataOffset());
         return ServerResponse.create(request.getSequenceId(), request.getSerializeType());
     }
 

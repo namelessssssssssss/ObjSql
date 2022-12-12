@@ -27,6 +27,7 @@ public class ServerResponse {
      */
     private byte serializeType;
 
+
     private Object index;
     /**
      * 查询到的对象。
